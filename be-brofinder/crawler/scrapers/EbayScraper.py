@@ -5,6 +5,10 @@ from pprint import pprint
 link = "https://www.ebay.it/sch/i.html?_from=R40&_trksid=p2380057.m570.l1313&_nkw=iphone&_sacat=0"
 
 
+class EbayScraper:
+    pass
+
+
 
 response = requests.get(link)                           #utilizzando il metodo get della libreria requests che abbiamo precedentemente importato
                                                         #abbiamo la possibilità di ottenere il link specificato tramite una richiesta http
