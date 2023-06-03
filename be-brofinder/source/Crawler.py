@@ -1,7 +1,7 @@
 from source.crawler.helpers.Singleton import Singleton
 from source.crawler.scrapers.Scraper import Scraper
 
-from source.tests.Test import TestSuite
+from tests.Test import TestSuite
 
 from importlib import import_module
 import glob
