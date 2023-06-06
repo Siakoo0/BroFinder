@@ -7,7 +7,8 @@ link = "https://www.ebay.it/sch/i.html?_from=R40&_trksid=p2380057.m570.l1313&_nk
 
 
 class EbayScraper:
-    pass
+    def search(self, product : str):
+        return []
 
 
 
