@@ -10,8 +10,8 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 
-from source.crawler.entities.Product import Product
-from source.crawler.scrapers.Scraper import Scraper
+from source.crawlers.entities.Product import Product
+from source.crawlers.scrapers.Scraper import Scraper
 
 class AmazonProduct:
     def __init__(self) -> None:
@@ -24,7 +24,6 @@ class AmazonScraper(Scraper):
     @property
     def base_url(self):
         return "https://www.amazon.it"
-    
 
     def search(self, product: str) -> List[Product]:
         # First fetching of pages
