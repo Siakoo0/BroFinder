@@ -5,11 +5,6 @@ from pprint import pprint
 from source.crawlers.entities.Product import Product
 from source.crawlers.scrapers.Scraper import Scraper
 
-from selenium.webdriver import Chrome
-from selenium.webdriver.chrome.service import Service
-
-from webdriver_manager.chrome import ChromeDriverManager
-
 from urllib.parse import urlencode
 
 class EbayScraper(Scraper):
@@ -17,8 +12,7 @@ class EbayScraper(Scraper):
     
     def search(self, product: str) -> List[Product]:
 
-        chrome_driver = ChromeDriverManager().install()
-        driver = Chrome(service=Service(chrome_driver))
+        driver = self.getChromeInstance()
 
         params = {"_nkw" : "iphone"}
         driver.get(EbayScraper._uri + urlencode(params))
