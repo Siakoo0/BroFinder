@@ -34,16 +34,3 @@ class Scraper(ABC):
 
         driver : Chrome = webdriver.Chrome(options=options, executable_path="tools")
         return driver
-
-
-    # def makeRequest(self, url, method="get", params={}, options={}):
-    #     headers : dict = {
-    #         "User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
-    #     } | options
-        
-    #     return  request(
-    #         method=method, 
-    #         url=url, 
-    #         params=params, 
-    #         headers=headers
-    #     )

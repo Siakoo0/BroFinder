@@ -13,9 +13,14 @@ from queue import Queue
 from source.crawler.entities.Product import Product
 from source.crawler.scrapers.Scraper import Scraper
 
+class AmazonProduct:
+    def __init__(self) -> None:
+        pass
+
+    def get():
+        return
 
 class AmazonScraper(Scraper):
-
     @property
     def base_url(self):
         return "https://www.amazon.it"
@@ -31,16 +36,18 @@ class AmazonScraper(Scraper):
         pages_queue.put(url)
         chrome.get(url)
 
-        print(self.fetchPages(url, chrome.page_source))
+        print(self._fetchPages(url, chrome.page_source))
     
         # with ThreadPoolExecutor(10) as pool:
         #     while pages_queue.qsize() > 0:
         #         elem = pages_queue.get()
             
 
-    def fetchPages(self, url : str, respose):
+    def _fetchPages(self, url : str, respose):
         bs = BeautifulSoup(respose, "html.parser")
         return [a.get("href") for a in bs.select('div[role="navigation"] .s-pagination-strip a:not(span[aria-disabled=false] + a)')]
+
+
 
     #region extractInfoProduct
     #  def extractInfoProduct(self, product, product_list : list):
