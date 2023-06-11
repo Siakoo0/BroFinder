@@ -24,9 +24,18 @@ class AmazonScraper(Scraper):
         input()
         response : str = driver.page_source
 
-        with open("file.html", "w+", encoding="utf-8") as f:
-            f.write(response)
             
-        bs = BeautifulSoup(response, "html.parser")
-        print(bs)
+        soup = BeautifulSoup(response, "html.parser")
+        print(soup)
         pass
+    
+    
+    
+    
+    
+    
+    
+
+        
+        
+     
