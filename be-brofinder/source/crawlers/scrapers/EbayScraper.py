@@ -2,8 +2,8 @@ from typing import List
 import bs4, requests
 from pprint import pprint
 
-from source.crawler.entities.Product import Product
-from source.crawler.scrapers.Scraper import Scraper
+from source.crawlers.entities.Product import Product
+from source.crawlers.scrapers.Scraper import Scraper
 
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.service import Service

@@ -24,17 +24,19 @@ class Crawler(metaclass=Singleton):
             my_class = getattr(module, class_name_string.split(".")[-1])
             
             # Se non è una classe astratta
-            if not isabstract(my_class) and "__" not in fname and "test_" not in fname:
+            if not isabstract(my_class) and "__" not in fname:
                 class_instance : Scraper  = my_class()
                 Crawler.scrapers.append(class_instance)
 
     def start(self):
         try:
-            tests = TestSuite()
-            tests.run()
+            # tests = TestSuite()
+            # tests.run()
+
+            # print(Crawler.scrapers)
             
             for scraper in Crawler.scrapers:
-                scraper.search("iphone")
+                scraper.search("portatile")
             
         except Exception as e:
             print("Errore avvenuto all'interno del codice.", e)

@@ -9,7 +9,7 @@ class TestSuite(metaclass=Singleton):
         self.runner = unittest.TextTestRunner(verbosity=2)
 
     def run(self):
-        suite = unittest.defaultTestLoader.discover("./tests")
+        suite = unittest.defaultTestLoader.discover("tests")
         self.runner.run(suite)
 
     
