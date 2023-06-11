@@ -32,8 +32,6 @@ class Crawler(metaclass=Singleton):
         try:
             # tests = TestSuite()
             # tests.run()
-
-            # print(Crawler.scrapers)
             
             for scraper in Crawler.scrapers:
                 scraper.search("portatile")
