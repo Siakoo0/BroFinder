@@ -1,5 +1,5 @@
-from source.crawler.helpers.Singleton import Singleton
-from source.crawler.scrapers.Scraper import Scraper
+from source.crawlers.helpers.Singleton import Singleton
+from source.crawlers.scrapers.Scraper import Scraper
 
 from tests.Test import TestSuite
 
