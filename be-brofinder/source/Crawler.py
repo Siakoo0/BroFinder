@@ -8,6 +8,7 @@ import glob
 from inspect import isabstract
 from typing import List
 
+
 class Crawler(metaclass=Singleton):
     scrapers : List[Scraper] = []
 

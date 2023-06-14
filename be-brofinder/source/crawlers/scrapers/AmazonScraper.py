@@ -12,103 +12,136 @@ from queue import Queue
 
 from source.crawlers.entities.Product import Product
 from source.crawlers.scrapers.Scraper import Scraper
+import uuid
 
-class AmazonProduct:
-    def __init__(self) -> None:
-        pass
+import logging
+import threading
 
-    def get():
-        return
+from source.crawlers.utils.Logger import Logger
 
 class AmazonScraper(Scraper):
     @property
     def base_url(self):
         return "https://www.amazon.it"
 
+    def request(self, url, headers={}):
+        headers = headers | {
+            'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7'
+        }
+
+        return super().request(url, headers)
+
     def search(self, product: str) -> List[Product]:
-        # First fetching of pages
-        pages_queue = Queue(10)
-        chrome : Chrome = self.getChromeInstance()
-        
         params : dict = {"k" : product}
         url : str = "{}/s?{}".format(self.base_url, urlencode(params))
-        pages_queue.put(url)
-        chrome.get(url)
 
-        print(self._fetchPages(url, chrome.page_source))
+        req = self.request(url)
+
+        pages = self._fetchPages(req.text, url)
+
+        # Per ogni pagina estrapola tutti i prodotti e le raccogli in un vettore.
+        futures = []
+
+        with ThreadPoolExecutor(10) as pool:
+            for page in pages:
+                print("Submite page: ", page)
+                futures.append(pool.submit(self.extractFromPage, page))
+
+        products = []
+
+        for future in futures:
+            products += future.result()
+
+        with open("result.json", "w+", encoding="utf-8") as file:
+            file.write(products)
+
+        print("Risultato stampato!")
+
+    # Funzione che estrapola gli elementi
+    def extractFromPage(self, url):
+        thread_name = threading.current_thread().name
+
+        response = self.request(url)
+        bs : BeautifulSoup = BeautifulSoup(response.text, "html.parser")
+
+        product_links : ResultSet[Tag] = bs.select('[data-component-type="s-search-results"] [data-asin]:not([data-asin=""]) a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal[href*="/dp/"]')
+        
+        product_links : List[str] = [self.base_url + product.get("href").split("/ref")[0] for product in product_links]
     
-        # with ThreadPoolExecutor(10) as pool:
-        #     while pages_queue.qsize() > 0:
-        #         elem = pages_queue.get()
+        # Tolgo di mezzo i siti ripetuti derivata dalla ricerca del crawler
+        product_links = list(dict.fromkeys(product_links))
+        
+        products : List[Product] = []
+
+        for product in product_links:
+            self.logger.debug(f'Thread {thread_name} sta effettuando il fetching del prodotto: {product}')
             
-
-    def _fetchPages(self, url : str, respose):
-        bs = BeautifulSoup(respose, "html.parser")
-        return [a.get("href") for a in bs.select('div[role="navigation"] .s-pagination-strip a:not(span[aria-disabled=false] + a)')]
-
-
-
-    #region extractInfoProduct
-    #  def extractInfoProduct(self, product, product_list : list):
-    #     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+            self.extractInfoProduct(product, products)
         
-    #     options = webdriver.ChromeOptions()
-    #     options.add_argument("--headless=new")
-    #     options.add_argument(f"--user-agent={user_agent}")
-    #     options.add_argument('log-level=3') 
-    #     options.add_argument('window-size=1920x1080')
-    #     options.add_argument("disable-gpu")
+        print("Prodotti terminati: ", products)
 
-    #     driver : Chrome = webdriver.Chrome(options=options, executable_path="tools")
+        return products
 
-    #     driver.get(product)
-    #     bs = BeautifulSoup(driver.page_source, "html.parser")
-    #     images_tag_script  : str = bs.select_one("#imageBlock_feature_div > script:nth-child(3)").text 
-    #     # Prelevo le immagini del prodotto, qualsiasi dimensione
+    def _fetchPages(self, response, base_url):
+        bs = BeautifulSoup(response, "html.parser")
+        last_page = bs.select_one(".s-pagination-item.s-pagination-ellipsis + .s-pagination-item.s-pagination-disabled").getText()
 
-    #     text = images_tag_script.split("var data = ")[1].split(";")[0].replace("'", "\"").split("\"colorImages\": ")[1].split('"colorToAsin"')[0].strip().rstrip(",")
+        return [f"{base_url}&page={num}" for num in range(1, int(last_page)+1)]
 
-    #     product_info = {
-    #         "images" : [img["hiRes"] for img in loads(text)["initial"]]
-    #     }
+    def extractInfoProduct(self, product_url : str, product_list : list):
+        chrome = self.getChromeInstance()
+        chrome.get(product_url)
+
+        bs = BeautifulSoup(chrome.page_source, "html.parser")
+        chrome.quit()
+
+        product_info = {
+            "name" : ["#productTitle"],
+            "price" : ["span.a-price", "#price"],
+            "description" : ["#feature-bullets", "#bookDescription_feature_div"]
+        }
+
+        for key, possibleTags in product_info.items():
+            foundBool = False
+            
+            for selector in possibleTags:
+                product_info[key] : Tag = bs.select_one(selector)
+                
+                if product_info[key]:
+                    foundBool = True
+                    product_info[key] : Tag = product_info[key].text
+                    break
+            
+            if not foundBool:
+                product_info[key] = ""
+
+        product_info["url"] = product_url
+        product_info["reviews"] = []
         
-    #     product_list.append(product_info)
-    #endregion
-    
-    #region search
-    # def search(self, product: str) -> List[Product]:
-    #     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
 
-    #     options = webdriver.ChromeOptions()
-    #     options.add_argument("--headless=new")
-    #     options.add_argument(f"--user-agent={user_agent}")
-    #     options.add_argument('log-level=3') 
-    #     options.add_argument('window-size=1920x1080')
-    #     options.add_argument("disable-gpu")
+        product_list.append(product_info)
 
-    #     driver : Chrome = webdriver.Chrome(options=options, executable_path="tools")
+        # try:
+            
+        #     #feature-bullets o #bookDescription_feature_div
 
-    #     params : dict = {"k" : product}
-    #     url : str = "{}/s?{}".format(self.base_url, urlencode(params))
+        #     images_tag_script = bs.select_one("#imageBlock_feature_div > script:nth-child(3)")
 
-    #     driver.get(url)
+        #     if images_tag_script:
+        #         images_tag_script = images_tag_script.text
+                
+        #         # Prelevo le immagini del prodotto, qualsiasi dimensione
+        #         text = images_tag_script.split("var data = ")[1].split(";")[0].replace("'", "\"").split("\"colorImages\": ")[1].split('"colorToAsin"')[0].strip().rstrip(",")
 
-    #     response : str = driver.page_source 
+        #         product_info["images"] = [img["hiRes"] for img in loads(text)["initial"]]
+        #     else:
+        #         product_info["images"] = []
+
+
+
+
+        # except Exception as e:
+        #     errors[product_url] = str(e)
+
         
-    #     bs = BeautifulSoup(response, "html.parser")
 
-    #     productTags : ResultSet[Tag] = bs.select('[data-component-type="s-search-results"] [data-asin]:not([data-asin=""]) a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal[href*="/dp/"]')
-
-    #     products : List[str] = [self.base_url + product.get("href").split("/ref")[0] for product in productTags]
-
-    #     # Tolgo di mezzo i siti ripetuti derivata dalla ricerca del crawler
-    #     products = list(dict.fromkeys(products))
-
-    #     product_list = []
-
-    #     with ThreadPoolExecutor(max_workers=10) as pool:
-    #         for product in products:
-    #             pool.submit(self.extractInfoProduct, product, product_list)
-        
-    #     print(product_list)
-    #endregion

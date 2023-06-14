@@ -1,19 +1,22 @@
 from abc import ABC, abstractmethod
 from typing import List
-from requests import request
+from requests import get
 
-from source.crawlers.helpers.UserAgentGenerator import UserAgentGenerator
-
+from source.crawlers.utils.UserAgentGenerator import UserAgentGenerator
 from source.crawlers.entities.Product import Product
 
 from selenium import webdriver
 from selenium.webdriver import Chrome
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 
-from webdriver_manager.chrome import ChromeDriverManager
-
+import logging
 
 class Scraper(ABC):
+    logger = None
+
+    def __init__(self) -> None:
+        self.configLogger()
+
     @abstractmethod
     def search(self, product: str) -> List[Product]:
         pass
@@ -25,6 +28,13 @@ class Scraper(ABC):
 
     def user_agent(self):
         return UserAgentGenerator.generate() 
+    
+    def request(self, url, headers={}):
+        user_agent = self.user_agent()
+        __headers = headers | {
+            'User-Agent': user_agent
+        }
+        return get(url, headers=__headers)
 
     def getChromeInstance(self) -> Chrome:
         user_agent = self.user_agent()
@@ -34,6 +44,24 @@ class Scraper(ABC):
         options.add_argument(f"--user-agent={user_agent}")
         options.add_argument('window-size=1920x1080')
         options.add_argument("disable-gpu")
+        options.add_argument("--log-level=3")
+
+        options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
         driver : Chrome = webdriver.Chrome(options=options, executable_path="tools")
         return driver
+    
+    @classmethod
+    def configLogger(self):
+        if self.logger is not None:
+            logger = logging.getLogger("ScraperLogger")
+            
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            console_handler.setFormatter(formatter)
+
+            logger.addHandler(console_handler)
+
+            self.logger = logger
