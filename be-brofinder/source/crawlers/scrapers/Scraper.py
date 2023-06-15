@@ -9,14 +9,9 @@ from selenium import webdriver
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 
-import logging
+from source.crawlers.utils.Logger import Logger
 
 class Scraper(ABC):
-    logger = None
-
-    def __init__(self) -> None:
-        self.configLogger()
-
     @abstractmethod
     def search(self, product: str) -> List[Product]:
         pass
@@ -51,17 +46,10 @@ class Scraper(ABC):
         driver : Chrome = webdriver.Chrome(options=options, executable_path="tools")
         return driver
     
-    @classmethod
-    def configLogger(self):
-        if self.logger is not None:
-            logger = logging.getLogger("ScraperLogger")
-            
-            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-            
-            console_handler = logging.StreamHandler()
-            console_handler.setLevel(logging.INFO)
-            console_handler.setFormatter(formatter)
-
-            logger.addHandler(console_handler)
-
-            self.logger = logger
+    @property
+    def logger(self):
+        try:
+            return self._logger
+        except AttributeError:
+            self._logger = Logger.createLogger("ScraperLogger")
+            return self._logger

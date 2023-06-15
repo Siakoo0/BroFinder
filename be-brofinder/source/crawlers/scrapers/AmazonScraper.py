@@ -16,10 +16,10 @@ import uuid
 
 import logging
 import threading
-
-from source.crawlers.utils.Logger import Logger
+import json
 
 class AmazonScraper(Scraper):
+
     @property
     def base_url(self):
         return "https://www.amazon.it"
@@ -40,26 +40,21 @@ class AmazonScraper(Scraper):
         pages = self._fetchPages(req.text, url)
 
         # Per ogni pagina estrapola tutti i prodotti e le raccogli in un vettore.
-        futures = []
-
-        with ThreadPoolExecutor(10) as pool:
-            for page in pages:
-                print("Submite page: ", page)
-                futures.append(pool.submit(self.extractFromPage, page))
-
         products = []
 
-        for future in futures:
-            products += future.result()
+        with ThreadPoolExecutor(5) as pool:
+            for page in pages:
+                pool.submit(self.extractFromPage, page, products)
+
 
         with open("result.json", "w+", encoding="utf-8") as file:
-            file.write(products)
+            json.dump(products, file)
 
         print("Risultato stampato!")
 
     # Funzione che estrapola gli elementi
-    def extractFromPage(self, url):
-        thread_name = threading.current_thread().name
+    def extractFromPage(self, url, products : List[Product]):
+        self.logger.info(f"Inizio il fetching dei prodotti dalla pagina {url}")
 
         response = self.request(url)
         bs : BeautifulSoup = BeautifulSoup(response.text, "html.parser")
@@ -70,17 +65,24 @@ class AmazonScraper(Scraper):
     
         # Tolgo di mezzo i siti ripetuti derivata dalla ricerca del crawler
         product_links = list(dict.fromkeys(product_links))
+
+        self.logger.info(f"Estrapolazione link completata con successo nell'url {url}.")
+        self.logger.debug(f"Il numero di link estrapolati della pagina {url} sono: {len(product_links)}")
         
-        products : List[Product] = []
+        products_list : List[Product] = []
 
         for product in product_links:
-            self.logger.debug(f'Thread {thread_name} sta effettuando il fetching del prodotto: {product}')
-            
-            self.extractInfoProduct(product, products)
+            with ThreadPoolExecutor(20) as pool:
+                pool.submit(self.extractInfoProduct, product, products_list)
         
-        print("Prodotti terminati: ", products)
+        file = f".test_files/success/{uuid.uuid4()}.json" 
 
-        return products
+        with open(file, "w+", encoding="utf-8") as fp:
+            json.dump(products_list, fp)
+
+        self.logger.info(f'Terminato il fetching dei prodotti, salvataggio dei risultati nel file: {file}')
+
+        products.append(products_list)
 
     def _fetchPages(self, response, base_url):
         bs = BeautifulSoup(response, "html.parser")
@@ -89,6 +91,8 @@ class AmazonScraper(Scraper):
         return [f"{base_url}&page={num}" for num in range(1, int(last_page)+1)]
 
     def extractInfoProduct(self, product_url : str, product_list : list):
+        self.logger.info(f'Inizio fetching del prodotto: {product_url}')
+        
         chrome = self.getChromeInstance()
         chrome.get(product_url)
 
@@ -97,8 +101,8 @@ class AmazonScraper(Scraper):
 
         product_info = {
             "name" : ["#productTitle"],
-            "price" : ["span.a-price", "#price"],
-            "description" : ["#feature-bullets", "#bookDescription_feature_div"]
+            "price" : ["#apex_desktop span.a-price .a-offscreen", "#price"],
+            "description" : ["#feature-bullets ul", "#bookDescription_feature_div"]
         }
 
         for key, possibleTags in product_info.items():
@@ -109,7 +113,7 @@ class AmazonScraper(Scraper):
                 
                 if product_info[key]:
                     foundBool = True
-                    product_info[key] : Tag = product_info[key].text
+                    product_info[key] : Tag = product_info[key].text.strip()
                     break
             
             if not foundBool:
@@ -118,8 +122,9 @@ class AmazonScraper(Scraper):
         product_info["url"] = product_url
         product_info["reviews"] = []
         
-
+ 
         product_list.append(product_info)
+        self.logger.info(f'Fine fetching del prodotto: {product_url}')
 
         # try:
             
