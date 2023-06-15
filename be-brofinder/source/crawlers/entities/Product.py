@@ -5,9 +5,9 @@ from source.crawlers.entities.Review import Review
 class Product:
     def __init__(self,
             name: str, 
-            price: float, 
+            price: str, 
             descript: str, 
-            reviews: List[Review],
+            reviews: dict[Review],
             url : str
         ) -> None:
 
