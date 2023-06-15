@@ -2,7 +2,7 @@ import unittest
 from unittest.suite import TestSuite
 from unittest import TestCase
 
-from source.crawlers.helpers.Singleton import Singleton
+from source.crawlers.utils.Singleton import Singleton
 
 class TestSuite(metaclass=Singleton):
     def __init__(self) -> None:

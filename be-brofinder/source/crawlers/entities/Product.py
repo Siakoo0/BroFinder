@@ -6,14 +6,14 @@ class Product:
     def __init__(self,
             name: str, 
             price: float, 
-            descript: str, 
+            description: str, 
             reviews: List[Review],
             url : str
         ) -> None:
 
         self.name = name
         self.price = price
-        self.descript = descript
+        self.descript = description
         self.reviews = reviews
         
         self.url = url
