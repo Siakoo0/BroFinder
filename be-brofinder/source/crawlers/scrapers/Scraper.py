@@ -7,11 +7,12 @@ from source.crawlers.entities.Product import Product
 
 from selenium import webdriver
 from selenium.webdriver import Chrome
-from selenium.webdriver.chrome.options import Options
 
 from source.utils.Logger import Logger
 
 class Scraper(ABC):
+    logger = Logger.createLogger("ScraperLogger")
+
     @abstractmethod
     def search(self, product: str) -> List[Product]:
         pass
@@ -29,6 +30,7 @@ class Scraper(ABC):
         __headers = headers | {
             'User-Agent': user_agent
         }
+
         return get(url, headers=__headers)
 
     def getChromeInstance(self) -> Chrome:
@@ -46,10 +48,3 @@ class Scraper(ABC):
         driver : Chrome = webdriver.Chrome(options=options, executable_path="tools")
         return driver
     
-    @property
-    def logger(self):
-        try:
-            return self._logger
-        except AttributeError:
-            self._logger = Logger.createLogger("ScraperLogger")
-            return self._logger

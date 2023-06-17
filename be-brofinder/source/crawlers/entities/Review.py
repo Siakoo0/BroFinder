@@ -1,5 +1,5 @@
-from typing import List
-
 class Review:
-    def __init__(self, text : str, vote : int = None, media : List[str] = []) -> None:
-        pass
+    def __init__(self, text : str, vote : int = None) -> None:
+        self.text = text
+        if vote:
+            self.vote = vote
