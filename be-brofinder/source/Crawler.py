@@ -1,4 +1,4 @@
-from source.crawlers.utils.Singleton import Singleton
+from source.utils.Singleton import Singleton
 from source.crawlers.scrapers.Scraper import Scraper
 
 from tests.Test import TestSuite

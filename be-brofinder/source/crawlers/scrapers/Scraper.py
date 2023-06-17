@@ -2,14 +2,14 @@ from abc import ABC, abstractmethod
 from typing import List
 from requests import get
 
-from source.crawlers.utils.UserAgentGenerator import UserAgentGenerator
+from source.utils.UserAgentGenerator import UserAgentGenerator
 from source.crawlers.entities.Product import Product
 
 from selenium import webdriver
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 
-from source.crawlers.utils.Logger import Logger
+from source.utils.Logger import Logger
 
 class Scraper(ABC):
     @abstractmethod
