@@ -1,6 +1,6 @@
 from random import choice
 
-from source.crawlers.utils.Singleton import Singleton
+from source.utils.Singleton import Singleton
 
 class UserAgentGenerator(metaclass=Singleton):
     __user_agents = {}
@@ -12,7 +12,7 @@ class UserAgentGenerator(metaclass=Singleton):
     @classmethod
     def generate(cls):
         if not len(cls.__user_agents):
-            with open("./source/crawlers/utils/user-agents.txt", "r") as f:
+            with open("./source/utils/user-agents.txt", "r") as f:
                 cls.__user_agents = {user_agent : 0 for user_agent in f.read().split("\n")}
 
         user_agent = choice(list(cls.__user_agents.keys()))
