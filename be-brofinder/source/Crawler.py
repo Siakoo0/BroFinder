@@ -1,4 +1,4 @@
-from source.crawlers.helpers.Singleton import Singleton
+from source.crawlers.utils.Singleton import Singleton
 from source.crawlers.scrapers.Scraper import Scraper
 
 from tests.Test import TestSuite
@@ -8,10 +8,16 @@ import glob
 from inspect import isabstract
 from typing import List
 
+
+import logging
+
 class Crawler(metaclass=Singleton):
     scrapers : List[Scraper] = []
 
     def __init__(self) -> None:
+        # Impostazione del logger ROOT ad un ascolto di qualsiasi tipologia di logger.
+        logging.getLogger().setLevel(logging.NOTSET)
+
         # Per ogni file contenuto all'interno della cartella "scrapers", seleziona tutti i file python 
         for fname in glob.glob("./source/**/scrapers/*.py", recursive=True):
             # Costruisco il percorso per importare il modulo

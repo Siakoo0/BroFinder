@@ -5,15 +5,15 @@ from source.crawlers.entities.Review import Review
 class Product:
     def __init__(self,
             name: str, 
-            price: str, 
-            descript: str, 
-            reviews: dict[Review],
+            price: float, 
+            description: str, 
+            reviews: List[Review],
             url : str
         ) -> None:
 
         self.name = name
         self.price = price
-        self.descript = descript
+        self.descript = description
         self.reviews = reviews
         
         self.url = url
