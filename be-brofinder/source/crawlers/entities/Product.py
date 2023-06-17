@@ -44,9 +44,9 @@ class Product(Entity):
             return Product(**product)
         return None
     
-    def isExpired(self) -> bool:
+    def isExpired(self, minutes=3) -> bool:
         now = datetime.now()
-        return now - self.created_at > timedelta(minutes=3)
+        return now - self.created_at > timedelta(minutes=minutes)
 
     def save(self):
         entity = {}

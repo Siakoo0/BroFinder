@@ -1,91 +1,144 @@
 from typing import List
-import bs4, requests
+from bs4 import BeautifulSoup, ResultSet, Tag
 from pprint import pprint
+
+from concurrent.futures import ThreadPoolExecutor
 
 from source.crawlers.entities.Product import Product
 from source.crawlers.scrapers.Scraper import Scraper
 
-from selenium.webdriver import Chrome
-from selenium.webdriver.chrome.service import Service
-
-from webdriver_manager.chrome import ChromeDriverManager
-
 from urllib.parse import urlencode
 
+import uuid
+import json
+import os
+
 class EbayScraper(Scraper):
-    _uri = "https://www.ebay.it/sch/i.html?"
+    
+    @property
+    def base_url(self):
+        return "https://www.ebay.it/sch/i.html"
+    
+    def request(self, url, headers={}):
+        headers = headers | {
+            'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7'
+        }
+
+        return super().request(url, headers)
     
     def search(self, product: str) -> List[Product]:
-
-        chrome_driver = ChromeDriverManager().install()
-        driver = Chrome(service=Service(chrome_driver))
-
-        params = {"_nkw" : "iphone"}
-        driver.get(EbayScraper._uri + urlencode(params))
         
-        response : str = driver.page_source
-        soup = bs4.BeautifulSoup(response, 'html.parser')  #questa funzione estrapola il testo della risposta ottenuta che sarà in formato html
-
-        div_ads : bs4.Tag = soup.find('div', class_ = 'srp-river-results clearfix')   #ottengo il div di tutti gli annunci
-        #------------------------------scraping nome del prodotto-------------------------
-
-        div_name : List[bs4.Tag] = div_ads.find_all('div', class_ = 's-item__title')
-        name_ads = []
-
-        # .s-item__info a .s-item__title
-        #utlizzo un for in cui per ogni div_nome trovo lo span tramite find
-        for div in div_name:
-            span_name = div.find('span')
-            name_prod = span_name.text.replace("Nuova inserzione", "")
-            name_ads.append(name_prod.strip())
-            print(div.parent.get("href"))
+        params : dict = {"_nkw" : product}
+        url : str = "{}?{}".format(self.base_url, urlencode(params))
         
-        #---------------------------scraping prezzo del prodotto------------------------------
+        response = self.request(url)
+        
+        pages = self._fetchPages(response)
 
-        div_price = div_ads.find_all('span', class_ = 's-item__price')  #ottengo il div di tutti gli annunci
+        #Array che conterra tutti i prodotti
+        products = []
+        
+        #in ogni pagine estrapola tutti i prodotti e le reccoglie nell'array sopra dichiarato
+        with ThreadPoolExecutor(5) as pool:#classe che permette di utilizzare i Thread dalla pool
+            for page in pages:
+                pool.submit(self.extractFromPage, page, products)
+                return
+                
+                
+        with open("result.json", "w+", encoding="utf-8") as file:
+            json.dump(products, file)
+        print("Risultato stampato!")
+        
+        
+        
+    
+    #Funzione che estrapola gli elementi
+    def extractFromPage(self, url, products : List[Product]):
+        # self.logger.info(f"Inizio il fetching dei prodotti dalla pagina {url}")
+        
+        response = self.request(url)
+        soup : BeautifulSoup = BeautifulSoup(response.text, 'html.parser')
+        
+        product_links : ResultSet[Tag] = soup.select('.srp-river-results .clearfix .s-item__link')
+        
+        product_links : List[str] = [product.get("href").split("?")[0] for product in product_links]
+        
+        # self.logger.info(f"Estrapolazione link completata con successo nell'url {url}.")
+        # self.logger.debug(f"Il numero di link estrapolati della pagina {url} sono: {len(product_links)}")
+        
+        products_list : List[Product] = []
+        
+        for product in product_links:
+            with ThreadPoolExecutor(20) as pool:
+                pool.submit(self.extractInfoProduct, product, products_list)
+                return
+                
+        file = f".test_files/success/{uuid.uuid4()}.json"
+    
+        with open(file, "w+", encoding="utf-8") as fp:
+            json.dump(products_list, fp)
 
-        price_ads = []
-
-        for div in div_price:
-            price_prod = div.text.replace("EUR", "")
-            price_ads.append('€' + price_prod)
+        # self.logger.info(f'Terminato il fetching dei prodotti, salvataggio dei risultati nel file: {file}')
+        
+        products.append(products_list)
+        
+    def extractInfoProduct(self, product_url : str, product_list : list):
+        # print(f"Inizio fetching del prodotto {product_url}")
+        
+        chrome = self.getChromeInstance()
+        chrome.get(product_url)
+        
+        soup = BeautifulSoup(chrome.page_source, "html.parser")
+        chrome.quit()
+        
+        descr_prod_1 = soup.select_one('.ux-expandable-textual-display-block-inline.hide span span.ux-textspans').text.strip()
+        
+        descr_prod = soup.select('.x-about-this-item .ux-labels-values__values')[1:]
+        
+        product_info = {
+            "name" : [".x-item-title__mainTitle span"],
+            "price" : [".x-price-primary span span.ux-textspans"]
+        }
+        
+        for key, possibleTags in product_info.items():
+            foundBool = False
             
+            for selector in possibleTags:
+                product_info[key] : Tag = soup.select_one(selector)
+                
+                if product_info[key]:
+                    foundBool = True
+                    product_info[key] : Tag = product_info[key].text.strip()
+                    break
+            
+            if not foundBool:
+                product_info[key] = ""
+            
+        descr_prod_2 = []
+          
+        for prod in descr_prod:
+            descr_prod_2.append(prod.text)
         
-        #---------------------------scraping descrizione del prodotto------------------------------
-
-        under_link = "https://www.ebay.it/itm/155366227110?hash=item242c8c7ca6:g:J~8AAOSwFOpkZ0a4&amdata=enc%3AAQAIAAAA4HLqzkMLO3G%2Bdmim1YUNuBWK7jBnwrWg4GgzR7U4buy5CclvqDYw2wwEAFkYuirxMhUvIY7NoeKh%2Fx9WCgUCbzwpka0CvIj7HoAgOwLM6Z45BtAURabb%2B01lBSnRPST%2BW0dc4laI2ipuSIsTA4D4QqsX%2FDsXd2Vhx26ZvZIynHNGlINwHqmQwjhMCsBLGCwWrYr4iXfjPfRNmxw3oaakC7UfdsTcE%2FlxMHlccnv8FVtNIPp8iVPrq0wBgIK3LrjeeOJ1bxz9liKt0MxbFILdUfAwxvHBszhncZkhZcSdF39c%7Ctkp%3ABFBMkLyOz49i"
-
-        response = requests.get(under_link)
-
-        response.raise_for_status()
-
-        soup = bs4.BeautifulSoup(response.text, 'html.parser')
-
-        div_features = soup.find('div', class_ = 'ux-layout-section-module-evo')    #div contenente descrizione del prodotto
-
-        child_features = div_features.find_all('div', class_ = 'ux-layout-section-evo__row')
-
-        list_features = {}
-
-        for div in child_features:
-            label = div.find('div', class_ = 'ux-labels-values__labels')
-            value = div.find('div', class_ = 'ux-labels-values__values')
-            list_features[label.text] = value.text
-
-        return
-
-
-
-
-
-
-
-
-
-
-
-   
-# response = requests.get(link)                           #utilizzando il metodo get della libreria requests che abbiamo precedentemente importato
-                                                        #abbiamo la possibilità di ottenere il link specificato tramite una richiesta http
-# response.raise_for_status()                             #per verificare lo stato della risposta del browser
-# soup = bs4.BeautifulSoup(response.text, 'html.parser')  #questa funzione estrapola il testo della risposta ottenuta che sarà in formato html
+        descr_prod = descr_prod_1 + " " + " ".join(descr_prod_2)
+        product_info["description"] = descr_prod
+        product_info["url"] = product_url
+        product_info["reviews"] = []
+        
+        product_list.append(product_info)
+        pprint(product_list)
+        
+    
+    
+    def _fetchPages(self, response):
+        soup = BeautifulSoup(response.text, "html.parser")
+        page_links = [a.get("href") for a in soup.select('.pagination__item')]
+        
+        if len(page_links) >= 1:
+            return page_links[:1] #Limita a 4 elementi
+        else:
+            return page_links
+    
+    
+    
+    
+    
