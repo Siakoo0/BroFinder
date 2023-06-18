@@ -15,7 +15,7 @@ class Scraper(ABC):
     logger = Logger.createLogger("ScraperLogger")
 
     @abstractmethod
-    def search(self, product: str) -> List[Product]:
+    async def search(self, product: str) -> List[Product]:
         pass
 
     @property
@@ -27,8 +27,8 @@ class Scraper(ABC):
         return f"{url}?{urlencode(params)}"
 
     def user_agent(self):
-        return UserAgentGenerator.generate() 
-    
+        return UserAgentGenerator.generate()
+
     def request(self, url, headers={}):
         user_agent = self.user_agent()
         __headers = headers | {
@@ -51,4 +51,3 @@ class Scraper(ABC):
 
         driver : Chrome = webdriver.Chrome(options=options, executable_path="tools")
         return driver
-    
