@@ -41,7 +41,7 @@ class AmazonScraper(Scraper):
                 if time_wait >= 10: raise RuntimeError("Can't scrape pages") # Secondi da aspettare
 
                 req = self.request(url)
-                pages = self._fetchPages(req.text, url)
+                pages = self.__fetchPages(req.text, url)
                 pages_fetched = True
             except AttributeError:
                 time_wait+=1
@@ -101,7 +101,7 @@ class AmazonScraper(Scraper):
 
         products += products_list
 
-    def _fetchPages(self, response, base_url):
+    def __fetchPages(self, response, base_url):
         bs = BeautifulSoup(response, "html.parser")
         last_page = bs.select_one(".s-pagination-item.s-pagination-ellipsis + .s-pagination-item.s-pagination-disabled").getText()
 
