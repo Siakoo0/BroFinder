@@ -7,6 +7,7 @@ from source.crawlers.entities.Product import Product
 
 from selenium import webdriver
 from selenium.webdriver import Chrome
+from urllib.parse import urlencode
 
 from source.utils.Logger import Logger
 
@@ -21,6 +22,9 @@ class Scraper(ABC):
     @abstractmethod
     def base_url(self):
         pass
+
+    def prepareSearchURL(self, url : str, params : List[str]):
+        return f"{url}?{urlencode(params)}"
 
     def user_agent(self):
         return UserAgentGenerator.generate() 

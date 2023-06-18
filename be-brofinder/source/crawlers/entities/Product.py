@@ -21,7 +21,8 @@ class Product(Entity):
             url : str,
             reviews: List[Review] = [],
             images : List[str] = [],
-            _id=ObjectId("648dde15e09333972404fe58"),
+            _id=ObjectId(),
+            reviews_summary = "",
             created_at=datetime.now()
         ) -> None:
 
@@ -33,6 +34,7 @@ class Product(Entity):
         self.images = images
         self.url = url
         self.created_at = created_at
+        self.reviews_summary = reviews_summary
 
         self.save()
 

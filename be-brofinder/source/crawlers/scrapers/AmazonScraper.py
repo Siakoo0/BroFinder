@@ -1,7 +1,6 @@
 from typing import List
 
 from bs4 import BeautifulSoup, ResultSet, Tag
-from urllib.parse import urlencode
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -32,13 +31,14 @@ class AmazonScraper(Scraper):
 
     def search(self, product: str) -> List[Product]:
         params : dict = {"k" : product}
-        url : str = "{}/s?{}".format(self.base_url, urlencode(params))
+        url : str = self.prepareSearchURL(self.base_url + "/s", params)
         pages_fetched = False
         time_wait = 0
 
         while not pages_fetched:
             try: 
-                if time_wait >= 10: raise RuntimeError("Can't scrape pages") # Secondi da aspettare
+                # Secondi da aspettare
+                if time_wait >= 10: raise RuntimeError("Can't scrape pages") 
 
                 req = self.request(url)
                 pages = self.__fetchPages(req.text, url)
@@ -47,22 +47,15 @@ class AmazonScraper(Scraper):
                 time_wait+=1
                 sleep(time_wait)
                 
-
         # Per ogni pagina estrapola tutti i prodotti e le raccogli in un vettore.
         products = []
 
         with ThreadPoolExecutor(5) as pool:
             for page in pages:
                 pool.submit(self.extractFromPage, page, products)
-                return
-
-        with open("result.json", "w+", encoding="utf-8") as file:
-            dump(products, file)
 
     # Funzione che estrapola gli elementi 
     def extractFromPage(self, url, products : List[Product]):
-        time_start = time()
-
         self.logger.info(f"Inizio il fetching dei prodotti dalla pagina {url}")
 
         response = self.request(url)
@@ -90,14 +83,6 @@ class AmazonScraper(Scraper):
                     continue 
                 
                 pool.submit(self.extractInfoProduct, product, products_list)
-                return
-
-        file = f".test_files/success/{uuid.uuid4()}_page.json" 
-
-        with open(file, "w+", encoding="utf-8") as fp:
-            dump(products_list, fp)
-
-        self.logger.info(f'Terminato il fetching dei prodotti, salvataggio dei risultati nel file in un totale di {round(time() - time_start, 2)}: {file}')
 
         products += products_list
 
@@ -113,7 +98,8 @@ class AmazonScraper(Scraper):
         product_info = {
             "name" : ["#productTitle"],
             "price" : ["#apex_desktop span.a-price .a-offscreen", "#price"],
-            "description" : ["#feature-bullets ul", "#bookDescription_feature_div"]
+            "description" : ["#feature-bullets ul", "#bookDescription_feature_div"],
+            "reviews_summary" : ['.AverageCustomerReviews span[data-hook="rating-out-of-text"]']
         }
 
         def extractData(source, key):
@@ -140,10 +126,10 @@ class AmazonScraper(Scraper):
 
             checkScriptTag = lambda elem: 'm.media-amazon.com/images' in elem.text
 
-            images_tag_script = list(filter(checkScriptTag, bs.select("#imageBlock_feature_div script")))[0]
+            images_tag_script = list(filter(checkScriptTag, bs.select("#imageBlock_feature_div script")))
 
             if images_tag_script:
-                images_tag_script = images_tag_script.text
+                images_tag_script = images_tag_script[0].text
                 
                 # Prelevo le immagini del prodotto, qualsiasi dimensione
                 text = images_tag_script.split("var data = ")[1].split(";")[0].replace("'", "\"").split("\"colorImages\": ")[1].split('"colorToAsin"')[0].strip().rstrip(",")
@@ -152,25 +138,84 @@ class AmazonScraper(Scraper):
             else:
                 product_info["images"] = []
 
-        def extractReviews(source):
-            reviews = []
-            
-            bs = BeautifulSoup(source, "html.parser")
+        def extractReviewsFromPage(source : BeautifulSoup, reviews : list):
+            reviews_elems = source.select('[data-hook="review"]')
 
-            for review_elem in bs.select('#cm-cr-dp-review-list div[data-hook="review"]'):
+            for rev in reviews_elems:
                 regex_vote = re.compile("^a-star-[1-5]$")
 
-                vote_html_elem = review_elem.select_one(".a-icon-star").get("class")
+                vote_html_elem = rev.select_one(".a-icon-star").get("class")
                 vote = list(filter(regex_vote.match, vote_html_elem))[0].split("-")[-1]
-                vote = int(vote)
 
-                review = {
-                    "text" : review_elem.select_one(".review-data:not(.review-format-strip)").text.replace("Leggi di più", "").strip("\n"),
-                    "vote" : vote
+                review_dict = {
+                    "text" : rev.select_one(".review-text").getText().strip().strip("\n"),
+                    "vote" : int(vote),
+                    "media" : [],
+                    "date" : rev.select_one('[data-hook="review-date"]').getText().split(" il ")[-1].strip().strip("\n")
                 }
 
-                reviews.append(Review(**review))
+                images =[image.get("src").replace("_SY88", "_SL1600_") for image in rev.select('.review-image-tile')]
 
+                for image in images:
+                    review_dict["media"].append(image)
+
+                reviews.append(Review(**review_dict))
+
+        def extractReviews():
+            reviews = []
+            
+            # Sostituisco al link dp (Detail Page) con product-reviews
+            reviews_url = re.sub("\/dp\/", "/product-reviews/", product_url)
+            
+            self.logger.info(f"Preparazione URL per fetching Recensioni del prodotto {product_url}")
+
+            # Parto dal presupposto che la prima pagina di recensioni abbia almeno 1 recensione
+            has_reviews = True
+
+            # Pagina della recensione di cui fare il fetching
+            page_number_rev = 1
+
+            # Istanza seleniunm
+            chrome = self.getChromeInstance()
+
+            # Lista dei sorgenti delle pagine recensioni di cui fare il fetching
+            pages : List[BeautifulSoup] = []
+
+            # Se la pagina contiene delle recensioni, continua ad iterare [ DISCOVERY PHASE ]
+            while has_reviews and page_number_rev < 5:
+                url = self.prepareSearchURL(reviews_url, {"pageNumber" : page_number_rev})
+                
+                chrome.get(url)
+
+                source = BeautifulSoup(chrome.page_source, "html.parser")
+                reviews_elems = source.select('[data-hook="review"]')
+
+                # Controllo se la pagina contiene delle recensioni
+                has_reviews = len(reviews_elems) > 0
+
+                # Se non ne contiene altre, termina e passa alla fase di fetching
+                if not has_reviews: break
+
+                self.logger.info(f"Trovata pagina con recensioni - {url}")
+
+                # Inserisci il sorgente nella lista delle pagine
+                pages.append(source)
+
+                # Numero della pagina a cui si dovrà passare dopo
+                page_number_rev+=1
+
+            chrome.close()
+
+            # Fetching Phase
+            
+            self.logger.info(f"Fetching delle recensioni in maniera concorrente del prodotto {product_url}")
+
+            with ThreadPoolExecutor(5) as pool:
+                for page in pages:
+                    pool.submit(extractReviewsFromPage, page, reviews)
+                
+            self.logger.info(f"Fine fetching delle recensioni del prodotto {product_url}")
+                
             product_info["reviews"] = reviews
 
         time_start = time()
@@ -183,7 +228,7 @@ class AmazonScraper(Scraper):
                 pool.submit(extractData, page.text, key)
             
             pool.submit(extractImages, page.text)
-            pool.submit(extractReviews, page.text)
+            pool.submit(extractReviews)
 
         product_info["url"] = product_url
 
