@@ -10,18 +10,19 @@ from source.utils.MongoDB import MongoDB
 from datetime import datetime, timedelta
 
 class Product(Entity):
-    
+
     def collection():
         return "products"
 
     def __init__(self,
-            name: str, 
-            price: float, 
-            description: str, 
+            name: str,
+            price: float,
+            description: str,
             url : str,
             reviews: List[Review] = [],
             images : List[str] = [],
-            _id=ObjectId("648dde15e09333972404fe58"),
+            _id=ObjectId(),
+            reviews_summary = "",
             created_at=datetime.now()
         ) -> None:
 
@@ -33,17 +34,18 @@ class Product(Entity):
         self.images = images
         self.url = url
         self.created_at = created_at
+        self.reviews_summary = reviews_summary
 
         self.save()
 
     @staticmethod
-    def find(url : str):
+    async def find(url : str):
         product = list(MongoDB().collection("products").find({"url": url}))
         if len(product) > 0:
             product = product[0]["data"][-1]
             return Product(**product)
         return None
-    
+
     def isExpired(self, minutes=3) -> bool:
         now = datetime.now()
         return now - self.created_at > timedelta(minutes=minutes)
@@ -54,7 +56,7 @@ class Product(Entity):
         for k, v in self.__dict__.items():
             if isinstance(v, list):
                 entity[k] = list(map(self.convert, v))
-            else:    
+            else:
                 entity[k] = self.convert(v)
 
         saved_entity = list(MongoDB().collection("products").find({"url": self.url}))
@@ -65,7 +67,7 @@ class Product(Entity):
             saved_entity["data"].append(entity)
 
             MongoDB().collection("products").update_one(
-                {"_id": saved_entity["_id"]}, 
+                {"_id": saved_entity["_id"]},
                 {"$set" : saved_entity}
             )
         else:

@@ -1,192 +1,134 @@
-from typing import List
-
-from bs4 import BeautifulSoup, ResultSet, Tag
-from urllib.parse import urlencode
-
-from concurrent.futures import ThreadPoolExecutor
-
-import uuid
-from json import loads, dump
-from time import time
-import re
+import asyncio
+import time
+import aiohttp
 
 from time import sleep
+from bs4 import BeautifulSoup, ResultSet, Tag
+from typing import List
+
+from uuid import uuid4
+
+from source.crawlers.scrapers.Scraper import Scraper
 
 from source.crawlers.entities.Product import Product
 from source.crawlers.entities.Review import Review
 
-from source.crawlers.scrapers.Scraper import Scraper
-
 class AmazonScraper(Scraper):
+    """
+        AmazonScraper, modulo per fare lo Scraping dei prodotti di
+    """
 
     @property
     def base_url(self):
         return "https://www.amazon.it"
 
-    def request(self, url, headers={}):
+    def request(self, url, headers : dict = {}):
         headers = headers | {
             'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7'
         }
 
         return super().request(url, headers)
 
-    def search(self, product: str) -> List[Product]:
-        params : dict = {"k" : product}
-        url : str = "{}/s?{}".format(self.base_url, urlencode(params))
-        pages_fetched = False
-        time_wait = 0
-
-        while not pages_fetched:
-            try: 
-                if time_wait >= 10: raise RuntimeError("Can't scrape pages") # Secondi da aspettare
-
-                req = self.request(url)
-                pages = self._fetchPages(req.text, url)
-                pages_fetched = True
-            except AttributeError:
-                time_wait+=1
-                sleep(time_wait)
-                
-
-        # Per ogni pagina estrapola tutti i prodotti e le raccogli in un vettore.
-        products = []
-
-        with ThreadPoolExecutor(5) as pool:
-            for page in pages:
-                pool.submit(self.extractFromPage, page, products)
-                return
-
-        with open("result.json", "w+", encoding="utf-8") as file:
-            dump(products, file)
-
-    # Funzione che estrapola gli elementi 
-    def extractFromPage(self, url, products : List[Product]):
-        time_start = time()
-
-        self.logger.info(f"Inizio il fetching dei prodotti dalla pagina {url}")
-
-        response = self.request(url)
-
-        bs : BeautifulSoup = BeautifulSoup(response.text, "html.parser")
-
-        product_links : ResultSet[Tag] = bs.select('[data-component-type="s-search-results"] [data-asin]:not([data-asin=""]) a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal[href*="/dp/"]')
-        
-        product_links : List[str] = [self.base_url + product.get("href").split("/ref")[0] for product in product_links]
-    
-        # Tolgo di mezzo i siti ripetuti derivata dalla ricerca del crawler
-        product_links = list(dict.fromkeys(product_links))
-
-        self.logger.info(f"Estrapolazione link completata con successo nell'url {url}.")
-        self.logger.debug(f"Il numero di link estrapolati della pagina {url} sono: {len(product_links)}")
-        products_list : List[Product] = []
-
-        for product in product_links:
-            with ThreadPoolExecutor(10) as pool:
-                product_entity = Product.find(product)
-
-                # Se il prodotto risulta essere stato rigenerato da meno di 15 minuti 
-                # (Meccanismo di cache)
-                if product_entity and not product_entity.isExpired(15):
-                    continue 
-                
-                pool.submit(self.extractInfoProduct, product, products_list)
-                return
-
-        file = f".test_files/success/{uuid.uuid4()}_page.json" 
-
-        with open(file, "w+", encoding="utf-8") as fp:
-            dump(products_list, fp)
-
-        self.logger.info(f'Terminato il fetching dei prodotti, salvataggio dei risultati nel file in un totale di {round(time() - time_start, 2)}: {file}')
-
-        products += products_list
-
-    def _fetchPages(self, response, base_url):
+    def __fetchPages(self, response, base_url):
         bs = BeautifulSoup(response, "html.parser")
         last_page = bs.select_one(".s-pagination-item.s-pagination-ellipsis + .s-pagination-item.s-pagination-disabled").getText()
 
         last_page = min(5, int(last_page)+1)
 
         return [f"{base_url}&page={num}" for num in range(1, last_page)]
-    
-    def extractInfoProduct(self, product_url : str, product_list : list):
+
+    def search(self, product) -> str:
+        start = time.time()
+
+        params : dict = {"k" : product}
+        url : str = self.prepareSearchURL(self.base_url + "/s", params)
+        fetched_pages = False
+        error_bool = False
+
+        time_wait = 0
+
+        while not fetched_pages and not error_bool:
+            if time_wait >= 10: error_bool = True
+            try:
+                req = self.request(url)
+                pages = self.__fetchPages(req.text, url)
+                fetched_pages = True
+            except:
+                time_wait+=1
+                sleep(time_wait)
+
+        if not error_bool:
+            # Start Async Part
+            asyncio.run(self.startFetch(pages))
+
+        end = time.time()
+
+        print("Tempo impiegato: {}s".format(end - start))
+
+    def getHeaders(self):
+        return {
+            'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
+            'User-Agent': self.user_agent()
+        }
+
+    # async def saveFile(self, async_request):
+    #     await asyncio.sleep(5)
+    #     with open(f"{uuid4()}_amazon.html", "w+", encoding="utf-8") as file:
+    #         file.write(await async_request.text())
+
+    async def extractFromPage(self, async_response):
+        text = await async_response.text()
+        url = str(async_response.url)
+
+        bs : BeautifulSoup = BeautifulSoup(text, "html.parser")
+        product_links : ResultSet[Tag] = bs.select('[data-component-type="s-search-results"] [data-asin]:not([data-asin=""]) a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal[href*="/dp/"]')
+
+        self.logger.info(f"Inizio il fetching dei prodotti dalla pagina {async_response.url}")
+
+        product_links : ResultSet[Tag] = bs.select('[data-component-type="s-search-results"] [data-asin]:not([data-asin=""]) a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal[href*="/dp/"]')
+
+        product_links : List[str] = [self.base_url + product.get("href").split("/ref")[0] for product in product_links]
+
+        # Tolgo di mezzo i siti ripetuti derivata dalla ricerca del crawler
+        product_links = list(dict.fromkeys(product_links))
+
+        self.logger.info(f"Estrapolazione link completata con successo nell'url {url}.")
+        self.logger.debug(f"Il numero di link estrapolati della pagina {url} sono: {len(product_links)}")
+
+        products_fetch_tasks = [asyncio.create_task(product) for product in product_links]
+
+        products = await asyncio.gather(*products_fetch_tasks)
+
+        return products
+
+    async def fetchProduct(self, product_url : str):
+        product_ent = await Product.find(product_url)
+
+        if product_ent and not product_ent.isExpired(15):
+            return
+
         product_info = {
             "name" : ["#productTitle"],
             "price" : ["#apex_desktop span.a-price .a-offscreen", "#price"],
-            "description" : ["#feature-bullets ul", "#bookDescription_feature_div"]
+            "description" : ["#feature-bullets ul", "#bookDescription_feature_div"],
+            "reviews_summary" : ['.AverageCustomerReviews span[data-hook="rating-out-of-text"]']
         }
 
-        def extractData(source, key):
-            bs = BeautifulSoup(source, "html.parser")
 
-            possible_tags = product_info[key]
 
-            foundBool = False
+    async def startFetch(self, pages : List[str]):
+        async with aiohttp.ClientSession(headers=self.getHeaders()) as session:
+            self.logger.info("Sto creando le varie task")
 
-            for selector in possible_tags:
-                product_info[key] : Tag = bs.select_one(selector)
-                
-                if product_info[key]:
-                    foundBool = True
-                    product_info[key] : str = product_info[key].text.strip()
-                    product_info[key] = re.sub(' +', ' ', product_info[key])
-                    break
-            
-                if not foundBool:
-                    product_info[key] = ""
-                
-        def extractImages(source):
-            bs = BeautifulSoup(source, "html.parser")
+            pages_task = [asyncio.create_task(session.get(page)) for page in pages]
 
-            checkScriptTag = lambda elem: 'm.media-amazon.com/images' in elem.text
+            self.logger.info("Attendo le varie task")
+            results = await asyncio.gather(*pages_task)
+            self.logger.info("Finite le varie task")
 
-            images_tag_script = list(filter(checkScriptTag, bs.select("#imageBlock_feature_div script")))[0]
+            products_fetch_req = [asyncio.create_task(self.extractFromPage(res)) for res in results]
 
-            if images_tag_script:
-                images_tag_script = images_tag_script.text
-                
-                # Prelevo le immagini del prodotto, qualsiasi dimensione
-                text = images_tag_script.split("var data = ")[1].split(";")[0].replace("'", "\"").split("\"colorImages\": ")[1].split('"colorToAsin"')[0].strip().rstrip(",")
+            products = await asyncio.gather(*products_fetch_req)
+            print(products)
 
-                product_info["images"] = [img["hiRes"] for img in loads(text)["initial"] if img is not None]
-            else:
-                product_info["images"] = []
-
-        def extractReviews(source):
-            reviews = []
-            
-            bs = BeautifulSoup(source, "html.parser")
-
-            for review_elem in bs.select('#cm-cr-dp-review-list div[data-hook="review"]'):
-                regex_vote = re.compile("^a-star-[1-5]$")
-
-                vote_html_elem = review_elem.select_one(".a-icon-star").get("class")
-                vote = list(filter(regex_vote.match, vote_html_elem))[0].split("-")[-1]
-                vote = int(vote)
-
-                review = {
-                    "text" : review_elem.select_one(".review-data:not(.review-format-strip)").text.replace("Leggi di più", "").strip("\n"),
-                    "vote" : vote
-                }
-
-                reviews.append(Review(**review))
-
-            product_info["reviews"] = reviews
-
-        time_start = time()
-        self.logger.info(f'Inizio fetching del prodotto: {product_url}')
-
-        page = self.request(product_url)
-
-        with ThreadPoolExecutor(3) as pool:
-            for key in product_info.keys():
-                pool.submit(extractData, page.text, key)
-            
-            pool.submit(extractImages, page.text)
-            pool.submit(extractReviews, page.text)
-
-        product_info["url"] = product_url
-
-        product_list.append(Product(**product_info))
-
-        self.logger.info(f'Fine fetching del prodotto in {round(time() - time_start, 2)}s : {product_url}')
+        print("LEL, funziona!")

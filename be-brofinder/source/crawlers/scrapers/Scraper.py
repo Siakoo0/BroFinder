@@ -7,6 +7,7 @@ from source.crawlers.entities.Product import Product
 
 from selenium import webdriver
 from selenium.webdriver import Chrome
+from urllib.parse import urlencode
 
 from source.utils.Logger import Logger
 
@@ -14,7 +15,7 @@ class Scraper(ABC):
     logger = Logger.createLogger("ScraperLogger")
 
     @abstractmethod
-    def search(self, product: str) -> List[Product]:
+    async def search(self, product: str) -> List[Product]:
         pass
 
     @property
@@ -22,9 +23,12 @@ class Scraper(ABC):
     def base_url(self):
         pass
 
+    def prepareSearchURL(self, url : str, params : List[str]):
+        return f"{url}?{urlencode(params)}"
+
     def user_agent(self):
-        return UserAgentGenerator.generate() 
-    
+        return UserAgentGenerator.generate()
+
     def request(self, url, headers={}):
         user_agent = self.user_agent()
         __headers = headers | {
@@ -47,4 +51,3 @@ class Scraper(ABC):
 
         driver : Chrome = webdriver.Chrome(options=options, executable_path="tools")
         return driver
-    

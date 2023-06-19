@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from source.crawlers.entities.Product import Product
 from source.crawlers.scrapers.Scraper import Scraper
+from source.crawlers.entities.Review import Review
 
 from urllib.parse import urlencode
 
@@ -33,7 +34,7 @@ class EbayScraper(Scraper):
         
         response = self.request(url)
         
-        pages = self._fetchPages(response)
+        pages = self._fetchPages(response, 4)
 
         #Array che conterra tutti i prodotti
         products = []
@@ -83,8 +84,8 @@ class EbayScraper(Scraper):
     def extractInfoProduct(self, product_url : str, product_list : list):
         print(f"Inizio fetching del prodotto {product_url}")
         
-        response = self.request(product_url)
-        soup = BeautifulSoup(response.text, "html.parser")
+        page = self.request(product_url)
+        soup = BeautifulSoup(page.text, "html.parser")
         
         
         product_info = {
@@ -126,33 +127,58 @@ class EbayScraper(Scraper):
         
         product_info["description"] = description_prod
         product_info["url"] = product_url
-        product_info["reviews"] = []
         
         product_list.append(product_info)
         
+        with ThreadPoolExecutor(3) as pool:
+            pool.submit(extractReviews, page.text)
+            pool.submit(extractImages, page.text)
+            pass
         
-        def extractReviews(source):
-            reviews = []
+        
+        def extractReviews(source: BeautifulSoup, reviews : list):
             
             soup = BeautifulSoup(source, 'html.parser')
             
             review_page = soup.select_one('#STORE_INFORMATION0-0-51-43-10-tabpanel-0 > div > div > a').get('href')
-            response = self.request(product_url)
+            response = self.request(review_page)
             bs = BeautifulSoup(response.text, 'html.parser')
             
-            bs.select()
+            pages = self._fetchPages(response, 5)
             
+            for page in pages:
+                response = self.request(page)
+                bs = BeautifulSoup(response.text, 'html.parser')
+                reviews_elem = bs.select('#feedback-cards > tbody > tr')
+                i = 1 
+                for rev in reviews_elem:
+                    review_dict = {
+                        "text": rev.select_one('.card__comment span').text.strip(),
+                        "vote": None,
+                        "media": [],
+                        "date": rev.select_one(f'#feedback-cards > tbody > tr:nth-child({i}) > td:nth-child(3) > div:nth-child(1) > span')
+                    }
+                    i += 1
+
+            reviews.append(Review(**review_dict))
+            
+            
+        def extractImages(source):
             pass
+        
+        
     
-    
-    def _fetchPages(self, response):
+    def _fetchPages(self, response, count):
         soup = BeautifulSoup(response.text, "html.parser")
         page_links = [a.get("href") for a in soup.select('.pagination__item')]
         
-        if len(page_links) >= 4:
-            return page_links[:4] #Limita a 4 elementi
+        if len(page_links) >= count:
+            return page_links[:count] #Limita a tot. elementi
         else:
             return page_links
+        
+        
+        
     
     
     
