@@ -30,9 +30,8 @@ class Scraper(ABC):
         return UserAgentGenerator.generate()
 
     def request(self, url, headers={}):
-        user_agent = self.user_agent()
         __headers = headers | {
-            'User-Agent': user_agent
+            'User-Agent': self.user_agent()
         }
 
         return get(url, headers=__headers)
