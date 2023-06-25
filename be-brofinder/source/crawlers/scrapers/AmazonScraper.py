@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from source.crawlers.scrapers.Scraper import Scraper
 import json
-
+from random import randint
 from source.crawlers.entities.Product import Product
 from source.crawlers.entities.Review import Review
 
@@ -29,13 +29,13 @@ class AmazonScraper(Scraper):
         return "https://www.amazon.it"
 
     def request(self, url, headers : dict = {}):
-        headers = self.getHeaders()
+        headers = self.getHeaders() | headers
 
         return super().request(url, headers)
 
     def __fetchPages(self, response, base_url):
         bs = BeautifulSoup(response, "html.parser")
-        last_page = bs.select_one(".s-pagination-item.s-pagination-ellipsis + .s-pagination-item.s-pagination-disabled").getText()
+        last_page = bs.select(".s-pagination-item")[-2].getText()
 
         last_page = min(5, int(last_page)+1)
 
@@ -58,12 +58,11 @@ class AmazonScraper(Scraper):
         print("Tempo impiegato: {}s".format(end - start))
 
     def getHeaders(self):
-        return {
-            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
-            'User-Agent': self.user_agent(),
-            'accept-encoding': 'gzip, deflate, br',
-            'accept-language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7',
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US, en;q=0.5'
         }
+        return headers
 
     def extractFromPage(self, response, url):
         async def getProductsSource(prods : List[str]):
@@ -89,14 +88,17 @@ class AmazonScraper(Scraper):
 
         loop = asyncio.new_event_loop()
         products_source = loop.run_until_complete(getProductsSource(product_links))
+        print(products_source)
         loop.close()
 
         results = []
 
+        with open(f"{uuid4()}_page.html", "w+", encoding="utf-8") as file:
+            file.write(response)
+
         with ThreadPoolExecutor(10) as pool:
             for product in products_source:
                 pool.submit(self.fetchProduct, results, *product)
-                return
 
     def fetchProduct(self, products : list, source_page : str, url : str):
         async def getReviewsSource():
@@ -104,19 +106,10 @@ class AmazonScraper(Scraper):
 
             self.logger.info(f"Preparazione URL per fetching Recensioni del prodotto {url}")
 
-            reviews_list = [self.prepareSearchURL(reviews_url, {"pageNumber" : page}) for page in range(1,6)]
-
-            print(reviews_list)
-
             async with aiohttp.ClientSession(headers=self.getHeaders()) as session:
-                reviews_task = [
-                    asyncio.create_task(session.get(url)) for url in reviews_list
-                ]
+                page = await session.get(reviews_url)
 
-                pages = await asyncio.gather(*reviews_task)
-                pages = [(await page.text(), str(page.url)) for page in pages]
-
-            return pages
+            return await page.text()
 
         self.logger.info("Inizio fetching prodotto {}".format(url))
 
@@ -128,7 +121,14 @@ class AmazonScraper(Scraper):
 
         product_info = {
             "url" : url,
-            "reviews" : []
+            "reviews" : [],
+            "images" : []
+        }
+
+        info = {
+            "url" : url,
+            "reviews" : [],
+            "images" : []
         }
 
         info_selector = {
@@ -150,25 +150,36 @@ class AmazonScraper(Scraper):
                         foundBool = True
                         product_info[key] : str = product_info[key].text.strip()
                         product_info[key] = re.sub(' +', ' ', product_info[key])
+                        info[key] = re.sub(' +', ' ', product_info[key])
                         break
 
                     if not foundBool:
                         product_info[key] = ""
+                        info[key] = ""
 
         def extractImages():
             checkScriptTag = lambda elem: 'm.media-amazon.com/images' in elem.text
 
             images_tag_script = list(filter(checkScriptTag, source.select("#imageBlock_feature_div script")))
 
+            product_info["images"] = []
             if images_tag_script:
                 images_tag_script = images_tag_script[0].text
 
                 # Prelevo le immagini del prodotto, qualsiasi dimensione
                 text = images_tag_script.split("var data = ")[1].split(";")[0].replace("'", "\"").split("\"colorImages\": ")[1].split('"colorToAsin"')[0].strip().rstrip(",")
 
-                product_info["images"] = [img["hiRes"] for img in loads(text)["initial"] if img is not None]
-            else:
-                product_info["images"] = []
+                prior_to_extract = ["hiRes", "large", "main"]
+
+                for img in loads(text)["initial"]:
+                    key = "hiRes"
+                    index_key = 0
+                    while img[key] is None and index_key < len(prior_to_extract):
+                        index_key+=1
+                        key = prior_to_extract[index_key]
+
+                    product_info["images"].append(img[key])
+                    info["images"].append(img[key])
 
         def extractReviews(rev_page, url, reviews : list):
             source = BeautifulSoup(rev_page, "html.parser")
@@ -196,33 +207,36 @@ class AmazonScraper(Scraper):
                 }
 
                 reviews.append(Review(**review_dict))
+                info['reviews'].append(review_dict)
 
         loop = asyncio.new_event_loop()
-        reviews = loop.run_until_complete(getReviewsSource())
+        review = loop.run_until_complete(getReviewsSource())
         loop.close()
+
+        with open(f"{uuid4()}_page.html", "w+", encoding="utf-8") as file:
+            file.write(review)
 
         with ThreadPoolExecutor(max_workers=10) as pool:
             pool.submit(extractData)
             pool.submit(extractImages)
-            print(len( reviews))
-            for review in reviews:
-                pool.submit(extractReviews, *review, product_info["reviews"])
+            pool.submit(extractReviews, review, url, product_info["reviews"])
 
         products.append(Product(**product_info, forceCreate=True))
 
     async def startFetch(self, url):
-        browser = await launch()
-        page = await browser.newPage()
-        await page.goto(url)
+        fetched = False
 
-        self.logger.info("Avvio dell'attività di fetching delle pagine Amazon.")
-
-        source = await page.content()
-        print(source)
-
-        self.__fetchPages(source, url)
-
-        return
+        while not fetched:
+            try:
+                chrome = self.getChromeInstance()
+                chrome.get(url)
+                pages = self.__fetchPages(chrome.page_source, url)
+                chrome.close()
+                fetched = True
+            except:
+                wait_time = randint(2, 4)
+                self.logger.info(f"Fetching fallito, riprovo a fare la richiesta tra {wait_time} secondi.")
+                time.sleep(wait_time)
 
         async with aiohttp.ClientSession(headers=self.getHeaders()) as session:
             self.logger.info(msg="Generazione delle richieste associate alle pagine.")
@@ -239,4 +253,3 @@ class AmazonScraper(Scraper):
         with ThreadPoolExecutor(5) as pool:
             for page in pages:
                 pool.submit(self.extractFromPage, *page)
-                return

@@ -40,8 +40,7 @@ class Scraper(ABC):
         user_agent = self.user_agent()
 
         options = webdriver.ChromeOptions()
-        options.add_argument("--headless=new")
-        options.add_argument(f"--user-agent={user_agent}")
+        # options.add_argument("--headless=new")
         options.add_argument('window-size=1920x1080')
         options.add_argument("disable-gpu")
         options.add_argument("--log-level=3")
