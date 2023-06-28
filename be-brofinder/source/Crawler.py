@@ -26,7 +26,7 @@ class Crawler(metaclass=Singleton):
     def __init__(self) -> None:
         # Classi da escludere durante il discovery degli Scrapers
         excluded_classes = [
-            "source.crawlers.scrapers.AmazonScraper"
+            "source.crawlers.scrapers.AmazonScraper",
             "source.crawlers.scrapers.AmazonScraperOld",
             "source.crawlers.scrapers.TrovaPrezziScraper"
         ]
