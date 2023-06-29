@@ -7,7 +7,7 @@ from time import time
 import re
 
 from time import sleep
-
+import time
 
 from bs4 import BeautifulSoup, ResultSet, Tag
 
@@ -30,6 +30,7 @@ class AmazonScraperOld(Scraper):
         return super().request(url, headers)
 
     def search(self, product: str) -> List[Product]:
+        start = time.time()
         params : dict = {"k" : product}
         url : str = self.prepareSearchURL(self.base_url + "/s", params)
         pages_fetched = False
@@ -53,6 +54,8 @@ class AmazonScraperOld(Scraper):
         with ThreadPoolExecutor(5) as pool:
             for page in pages:
                 pool.submit(self.extractFromPage, page, products)
+        end = time.time()
+        print("Tempo impiegato: {}s".format(round(end - start, 2)))
 
     # Funzione che estrapola gli elementi
     def extractFromPage(self, url, products : List[Product]):

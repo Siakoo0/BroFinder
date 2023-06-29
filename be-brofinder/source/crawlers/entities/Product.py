@@ -23,7 +23,8 @@ class Product(Entity):
             images : List[str] = [],
             _id=ObjectId(),
             reviews_summary = "",
-            created_at=datetime.now()
+            created_at=datetime.now(),
+            forceCreate = True
         ) -> None:
 
         self._id = _id
@@ -36,14 +37,15 @@ class Product(Entity):
         self.created_at = created_at
         self.reviews_summary = reviews_summary
 
-        self.save()
+        if forceCreate:
+            self.save()
 
     @staticmethod
-    async def find(url : str):
+    def find(url : str):
         product = list(MongoDB().collection("products").find({"url": url}))
         if len(product) > 0:
             product = product[0]["data"][-1]
-            return Product(**product)
+            return Product(**product, forceCreate=False)
         return None
 
     def isExpired(self, minutes=3) -> bool:
