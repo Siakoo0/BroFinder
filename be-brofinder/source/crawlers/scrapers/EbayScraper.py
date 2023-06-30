@@ -81,18 +81,13 @@ class EbayScraper(Scraper):
             "price" : [".x-price-primary span span.ux-textspans"]
         }
         
-        for key, possibleTags in product_info.items(): #assegno le chiavi del dizionario a "key" e i selettori css a "possibleTags"
-            foundBool = False
+        for key, selector in product_info.items(): #assegno le chiavi del dizionario a "key" e i selettori css a "selector"
             
-            for selector in possibleTags: #trasformo ogni singolo selettore e lo inserisco nel dizionario
-                product_info[key] : Tag = soup.select_one(selector)
+            product_info[key] : Tag = soup.select_one(selector)
                 
-                if product_info[key]:
-                    foundBool = True #se presente il selettore estratto allora lo trasformo in testo
-                    product_info[key] : Tag = product_info[key].text.strip()
-                    break
-            
-            if not foundBool: #altrimenti sarà una stringa vuota
+            if product_info[key]:
+                product_info[key] : Tag = product_info[key].text.strip()
+            else:
                 product_info[key] = ""
             
         #fino ad arrivare ai dettagli del prodotto, che inserisco in un array e che estrapolo uno alla volta
@@ -203,15 +198,7 @@ class EbayScraper(Scraper):
         images: List[str] = []
         
         #seleziono tutte le immagini del prodotto considerato
-        images_product = soup.select('.ux-image-magnify__container img.ux-image-magnify__image--original')
-        
-        for i in range(1, len(images_product)+1):
-            image = soup.select_one(f'#vi_main_img_fs > div > div > div > button:nth-child({i}) > img')
-            if image is not None:
-                images.append(image.get('src'))
-            else:
-                images.append(None)
-        product_info["images"] = images
+        product_info["images"] = [image.get("data-src") if image.get("data-src") is not None else image.get("src") for image in soup.select('.ux-image-magnify__cointainer img.ux-image-magnify__image--original')]
         
 
     def _fetchPages(self, response, count: int):
@@ -250,20 +237,3 @@ class EbayScraper(Scraper):
         url = [f"{base_url}{seller_url}{element_url}%3D{number}{final_url}" for number in range(1, min(5, len(n_page))+1)]
         return url
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        # fdbk-detail-list__tabbed-btn fake-btn fake-btn--large fake-btn--secondary
-        # fdbk-detail-list__tabbed-btn fake-btn fake-btn--large fake-btn--secondary
-        # fdbk-detail-list__btn-container__btn black-btn fake-btn fake-btn--large fake-btn--secondary
