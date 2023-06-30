@@ -55,7 +55,6 @@ class Crawler(metaclass=Singleton):
             if  not isabstract(my_class) and \
                 "__" not in fname and \
                 class_name_string not in excluded_classes:
-
                 class_instance : Scraper  = my_class()
                 Crawler.scrapers.append(class_instance)
 
@@ -63,7 +62,8 @@ class Crawler(metaclass=Singleton):
         try:
             # tests = TestSuite()
             # tests.run()
-
+            print(Crawler.scrapers)
+            
             for scraper in Crawler.scrapers:
                 scraper.search("portatile")
 

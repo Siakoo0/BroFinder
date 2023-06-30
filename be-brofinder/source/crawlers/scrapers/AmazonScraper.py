@@ -17,7 +17,6 @@ from random import randint
 from source.crawlers.entities.Product import Product
 from source.crawlers.entities.Review import Review
 
-from pyppeteer import launch
 
 class AmazonScraper(Scraper):
     """

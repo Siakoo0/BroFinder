@@ -2,19 +2,12 @@ from typing import List
 from bs4 import BeautifulSoup, ResultSet, Tag
 
 from concurrent.futures import ThreadPoolExecutor
-from playwright.sync_api import sync_playwright
-# from playwright.async_api import async_playwright
-# import asyncio
 
 from source.crawlers.entities.Product import Product
 from source.crawlers.entities.Review import Review
 from source.crawlers.scrapers.Scraper import Scraper 
 
 from urllib.parse import urlencode
-
-import uuid
-import json
-from json import dump
 
 class EbayScraper(Scraper):
     
@@ -65,6 +58,9 @@ class EbayScraper(Scraper):
         
         for product in product_links:
             with ThreadPoolExecutor(10) as pool:
+                prod = Product.find(product)
+                if prod and prod.isExpired(15): continue
+                
                 pool.submit(self.extractInfoProduct, product, products_list)
             
         products.append(products_list)
@@ -72,19 +68,20 @@ class EbayScraper(Scraper):
     def extractInfoProduct(self, product_url : str, product_list : list):
         print(f"Inizio fetching del prodotto {product_url}")
         
-        page = self.request(product_url) #entro nel prodotto selezionato e comincio lo scrape delle informazioni
+        # Entro nel prodotto selezionato e comincio lo scrape delle informazioni
+        page = self.request(product_url)
+        
         soup = BeautifulSoup(page.text, "html.parser")
         
         #creo il dizionario che conterrà tutte le info dei determianti prodotti
         product_info = {
-            "name" : [".x-item-title__mainTitle span"],
-            "price" : [".x-price-primary span span.ux-textspans"]
+            "name" : ".x-item-title__mainTitle span",
+            "price" : ".x-price-primary span span.ux-textspans"
         }
         
-        for key, selector in product_info.items(): #assegno le chiavi del dizionario a "key" e i selettori css a "selector"
-            
+        for key, selector in product_info.items(): 
             product_info[key] : Tag = soup.select_one(selector)
-                
+            
             if product_info[key]:
                 product_info[key] : Tag = product_info[key].text.strip()
             else:
@@ -110,7 +107,7 @@ class EbayScraper(Scraper):
                 descr_prod.append(prod.text)
         
         #infine salvo la descrizione e l'url di quel prodotto nel dizionario
-        product_info["description"] = descr_prod
+        product_info["description"] = ", ".join(descr_prod)
         product_info["url"] = product_url
         
 
@@ -138,7 +135,6 @@ class EbayScraper(Scraper):
             product_info["reviews_summary"] = reviews_summary
                 
         reviews: List[Review] = []
-        images: List[str] = []
 
         control_review = soup.select_one('#LISTING_FRAME_MODULE > div > div.d-stores-info-categories__details-container')
         with ThreadPoolExecutor(2) as pool:
@@ -146,24 +142,26 @@ class EbayScraper(Scraper):
                 pool.submit(self.extractReviews, page.text, reviews, product_info)
             else:
                 product_info["reviews"] = None
-            pool.submit(self.extractImages, page.text, images, product_info)
+            pool.submit(self.extractImages, page.text, product_info)
             
         product_list.append(Product(**product_info))
         
-        
+        print(product_info)
         self.logger.info(f'Fine fetching del prodotto in {product_url}')
         
     def extractReviews(self, response, reviews : list, product_info: dict):
-        
         #ottengo la struttura html del prodotto interessato
         soup = BeautifulSoup(response, 'html.parser')
 
         #ottengo l'href del bottone per entrare nella pagina di tutte le reviews
         button = soup.select_one('#STORE_INFORMATION0-0-54-46-10-tabpanel-0 > div > div > a')
+        
         if button is None:
             button = soup.select_one('#LISTING_FRAME_MODULE > div > div.d-stores-info-categories__details-container > div.d-stores-info-categories__details-container__tabbed-list > div > div.fdbk-detail-list__btn-container > a')
+
         if button is None:
             button = soup.select_one('#STORE_INFORMATION0-0-58-46-10-tabpanel-0 > div > div > a')
+        
         button_href = button.get('href')
         
 
@@ -187,19 +185,17 @@ class EbayScraper(Scraper):
             review_dict['date'] = date_review.text
             reviews.append(Review(**review_dict))
             i += 1
+
         product_info["reviews"] = reviews
             
             
-    def extractImages(self, response, images : list, product_info: dict):
-        
+    def extractImages(self, response, product_info: dict):
         #ottengo la struttura html del prodotto interessato
         soup = BeautifulSoup(response, 'html.parser')
-        
-        images: List[str] = []
-        
+
         #seleziono tutte le immagini del prodotto considerato
-        product_info["images"] = [image.get("data-src") if image.get("data-src") is not None else image.get("src") for image in soup.select('.ux-image-magnify__cointainer img.ux-image-magnify__image--original')]
-        
+        product_info["images"] = [image.get("data-src") if image.get("data-src") is not None else image.get("src") for image in soup.select('.ux-image-magnify__container img.ux-image-magnify__image--original') ]
+
 
     def _fetchPages(self, response, count: int):
         soup = BeautifulSoup(response.text, "html.parser")

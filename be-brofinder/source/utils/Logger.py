@@ -1,8 +1,5 @@
 import logging
 import sys
-import threading
-
-import inspect
 
 class Logger:
     @staticmethod
