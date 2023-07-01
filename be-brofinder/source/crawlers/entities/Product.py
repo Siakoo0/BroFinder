@@ -24,7 +24,8 @@ class Product(Entity):
             _id=ObjectId(),
             reviews_summary = "",
             created_at=datetime.now(),
-            forceCreate = True
+            forceCreate = True,
+            keyword=""
         ) -> None:
 
         self._id = _id
@@ -36,6 +37,7 @@ class Product(Entity):
         self.url = url
         self.created_at = created_at
         self.reviews_summary = reviews_summary
+        self.keyword=keyword
 
         if forceCreate:
             self.save()

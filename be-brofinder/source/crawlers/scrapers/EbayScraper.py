@@ -37,11 +37,11 @@ class EbayScraper(Scraper):
         #in ogni pagine estrapola tutti i prodotti e le reccoglie nell'array sopra dichiarato
         with ThreadPoolExecutor(5) as pool:#classe che permette di utilizzare i Thread dalla pool
             for page in pages:
-                pool.submit(self.extractFromPage, page, products)
+                pool.submit(self.extractFromPage, page, products, product)
               
         
     #Funzione che estrapola gli elementi
-    def extractFromPage(self, url, products : List[Product]):
+    def extractFromPage(self, url, products : List[Product], keyword):
         self.logger.info(f"Inizio il fetching dei prodotti dalla pagina {url}")
         
         response = self.request(url) #questo url contiene la prima pagina di prodotti 
@@ -61,11 +61,11 @@ class EbayScraper(Scraper):
                 prod = Product.find(product)
                 if prod and prod.isExpired(15): continue
                 
-                pool.submit(self.extractInfoProduct, product, products_list)
+                pool.submit(self.extractInfoProduct, product, products_list, keyword)
             
         products.append(products_list)
         
-    def extractInfoProduct(self, product_url : str, product_list : list):
+    def extractInfoProduct(self, product_url : str, product_list : list, keyword):
         print(f"Inizio fetching del prodotto {product_url}")
         
         # Entro nel prodotto selezionato e comincio lo scrape delle informazioni
@@ -109,6 +109,8 @@ class EbayScraper(Scraper):
         #infine salvo la descrizione e l'url di quel prodotto nel dizionario
         product_info["description"] = ", ".join(descr_prod)
         product_info["url"] = product_url
+
+        product_info["keyword"] = keyword
         
 
         # funzione che calcola media delle recensioni che verrà inserita in reviews_summary

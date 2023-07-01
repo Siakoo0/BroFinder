@@ -1,10 +1,21 @@
 version: '3.9'
 services:
+  mysqldb:
+    image: mysql:latest
+    container_name: brofinder_database_sql
+    restart: always
+    ports:
+      - 3306:3306
+    volumes:
+      - ./.data/mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
   mongodb:
+    container_name: brofinder_database_mongo
     image: mongo
     restart: always
     volumes:
-      - .data/mongodb:/data/db:rw
+      - .data/mongodb:/data/db
     ports:
       - 27017:27017
     environment:

@@ -23,7 +23,7 @@ class Scraper(ABC):
     def base_url(self):
         pass
 
-    def prepareSearchURL(self, url : str, params : List[str]):
+    def prepareSearchURL(self, url : str, params : dict):
         return f"{url}?{urlencode(params)}"
 
     def user_agent(self):
@@ -38,6 +38,7 @@ class Scraper(ABC):
 
     def getChromeInstance(self) -> Chrome:
         options = webdriver.ChromeOptions()
+        
         options.add_argument("--headless=new")
         options.add_argument('window-size=1920x1080')
         options.add_argument("disable-gpu")
@@ -45,5 +46,5 @@ class Scraper(ABC):
 
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
-        driver : Chrome = webdriver.Chrome(options=options, executable_path="tools")
+        driver : Chrome = webdriver.Chrome(options=options)
         return driver

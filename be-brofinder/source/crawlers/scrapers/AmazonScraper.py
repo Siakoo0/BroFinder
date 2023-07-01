@@ -17,6 +17,10 @@ from random import randint
 from source.crawlers.entities.Product import Product
 from source.crawlers.entities.Review import Review
 
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+
 
 class AmazonScraper(Scraper):
     """
@@ -43,12 +47,9 @@ class AmazonScraper(Scraper):
     def search(self, product) -> str:
         start = time.time()
 
-        params : dict = {"k" : product}
-        url : str = self.prepareSearchURL(self.base_url + "/s", params)
-
         loop = asyncio.new_event_loop()
 
-        loop.run_until_complete(self.startFetch(url))
+        loop.run_until_complete(self.startFetch(product))
 
         loop.close()
 
@@ -58,57 +59,69 @@ class AmazonScraper(Scraper):
 
     def getHeaders(self):
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            'User-Agent': self.user_agent(),
             'Accept-Language': 'en-US, en;q=0.5'
         }
         return headers
 
-    def extractFromPage(self, response, url):
+    def extractFromPage(self, response, url, search_text):
         async def getProductsSource(prods : List[str]):
             async with aiohttp.ClientSession(headers=self.getHeaders()) as req:
                 prods_task = [asyncio.create_task(req.get(prod)) for prod in prods]
 
                 prods_result = await asyncio.gather(*prods_task)
 
-                prods_source = [(await prod.text(), str(prod.url))for prod in prods_result]
+                prods_source = [(await prod.text(), str(prod.url), search_text)for prod in prods_result]
 
             return prods_source
 
-        bs : BeautifulSoup = BeautifulSoup(response, "html.parser")
+        fetched = False  
+        sleep_time = 0
 
-        product_links : ResultSet[Tag] = bs.select('[data-component-type="s-search-results"] [data-asin]:not([data-asin=""]) h2 a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal[href*="/dp/"]')
+        while not fetched and sleep_time < 5:
+            bs : BeautifulSoup = BeautifulSoup(response, "html.parser")
 
-        product_links : List[str] = [self.base_url + product.get("href").split("/ref")[0] for product in product_links]
+            product_links : ResultSet[Tag] = bs.select('[data-component-type="s-search-results"] [data-asin]:not([data-asin=""]) h2 a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal[href*="/dp/"]')
 
-        self.logger.info(f"Estrapolazione link completata con successo nell'url {url}.")
-        self.logger.debug(f"Il numero di link estrapolati della pagina {url} sono: {len(product_links)}")
+            product_links : List[str] = [self.base_url + product.get("href").split("/ref")[0] for product in product_links]
+
+            self.logger.info(f"Estrapolazione link completata con successo nell'url {url}.")
+
+            fetched = len(product_links) > 0
+
+            if not fetched:
+                sleep_time+=5
+                time.sleep(sleep_time)
+                response = self.request(url).text
+
+        if not fetched: return
 
         # Avvio del loop Async
 
         loop = asyncio.new_event_loop()
         products_source = loop.run_until_complete(getProductsSource(product_links))
-        print(products_source)
         loop.close()
 
         results = []
-
-        with open(f"{uuid4()}_page.html", "w+", encoding="utf-8") as file:
-            file.write(response)
 
         with ThreadPoolExecutor(10) as pool:
             for product in products_source:
                 pool.submit(self.fetchProduct, results, *product)
 
-    def fetchProduct(self, products : list, source_page : str, url : str):
-        async def getReviewsSource():
+    def fetchProduct(self, products : list, source_page : str, url : str, product_search):
+        def getReviewsSource():
             reviews_url = re.sub("\/dp\/", "/product-reviews/", url)
-
             self.logger.info(f"Preparazione URL per fetching Recensioni del prodotto {url}")
 
-            async with aiohttp.ClientSession(headers=self.getHeaders()) as session:
-                page = await session.get(reviews_url)
+            chrome = self.getChromeInstance()
+            chrome.get(reviews_url)
+            page = chrome.page_source
+            try:
+                chrome.close()            
+            except:
+                pass
 
-            return await page.text()
+            return page
 
         self.logger.info("Inizio fetching prodotto {}".format(url))
 
@@ -121,7 +134,8 @@ class AmazonScraper(Scraper):
         product_info = {
             "url" : url,
             "reviews" : [],
-            "images" : []
+            "images" : [],
+            "keyword": product_search
         }
 
         info = {
@@ -207,22 +221,23 @@ class AmazonScraper(Scraper):
 
                 reviews.append(Review(**review_dict))
                 info['reviews'].append(review_dict)
-
-        loop = asyncio.new_event_loop()
-        review = loop.run_until_complete(getReviewsSource())
-        loop.close()
-
-        with open(f"{uuid4()}_page.html", "w+", encoding="utf-8") as file:
-            file.write(review)
+            
+        review = getReviewsSource()
 
         with ThreadPoolExecutor(max_workers=10) as pool:
             pool.submit(extractData)
             pool.submit(extractImages)
             pool.submit(extractReviews, review, url, product_info["reviews"])
 
+        product_info["price"] = float(product_info["price"].strip("€").replace(",", ".")) 
+
         products.append(Product(**product_info, forceCreate=True))
 
-    async def startFetch(self, url):
+    async def startFetch(self, product):
+
+        params : dict = {"k" : product}
+        url : str = self.prepareSearchURL(self.base_url + "/s", params)
+
         fetched = False
 
         while not fetched:
@@ -245,7 +260,7 @@ class AmazonScraper(Scraper):
 
             self.logger.info("Richieste eseguite, conversione in sorgente html.")
 
-            pages = [(await page.text(), str(page.url)) for page in results]
+            pages = [(await page.text(), str(page.url), product) for page in results]
 
         self.logger.info("Terminata conversione, inizio analisi ed estrapolazione delle pagine.")
 
