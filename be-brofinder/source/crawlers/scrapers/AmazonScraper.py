@@ -10,14 +10,10 @@ from typing import List
 from concurrent.futures import ThreadPoolExecutor
 
 from source.crawlers.scrapers.Scraper import Scraper
-import json
-from random import randint
-from source.entities.Product import Product
-from source.entities.Review import Review
 
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
+from random import randint
+from source.database.mongodb.entities.Product import Product
+from source.database.mongodb.entities.Review import Review
 
 
 class AmazonScraper(Scraper):

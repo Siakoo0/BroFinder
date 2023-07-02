@@ -1,4 +1,4 @@
-from source.entities.Entity import Entity
+from source.database.mongodb.entities.Entity import Entity
 
 from bson.objectid import ObjectId
 from datetime import datetime

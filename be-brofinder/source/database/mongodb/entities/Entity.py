@@ -2,7 +2,7 @@ from abc import ABC, abstractclassmethod, abstractmethod
 from bson.objectid import ObjectId
 from datetime import datetime
 
-from source.utils.MongoDB import MongoDB
+from source.database.mongodb.MongoDB import MongoDB
 
 
 class Entity(ABC):

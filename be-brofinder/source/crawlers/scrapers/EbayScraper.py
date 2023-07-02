@@ -3,8 +3,8 @@ from bs4 import BeautifulSoup, ResultSet, Tag
 
 from concurrent.futures import ThreadPoolExecutor
 
-from source.entities.Product import Product
-from source.entities.Review import Review
+from source.database.mongodb.entities.Product import Product
+from source.database.mongodb.entities.Review import Review
 from source.crawlers.scrapers.Scraper import Scraper 
 
 from urllib.parse import urlencode

@@ -3,7 +3,7 @@ from typing import List
 from requests import get
 
 from source.utils.UserAgentGenerator import UserAgentGenerator
-from source.entities.Product import Product
+from source.database.mongodb.entities.Product import Product
 
 from selenium import webdriver
 from selenium.webdriver import Chrome

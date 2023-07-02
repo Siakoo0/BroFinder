@@ -1,6 +1,6 @@
 from flask_restful import Resource, reqparse
 
-from source.utils.MongoDB import MongoDB
+from source.database.mongodb.MongoDB import MongoDB
 
 class BaseResource(Resource):
     __name__ = "NoName"

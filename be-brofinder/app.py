@@ -1,26 +1,45 @@
-from bson.objectid import ObjectId
-# import asyncio
-
-
-from source.entities.Search import Search
-
 from source.crawlers.Crawler import Crawler
-
 from source.api.FlaskServer import FlaskServer
 
+from source.database.redis.RedisAgent import RedisAgent
+from queue import Queue
+
+from threading import Thread
+import logging
+
+from dotenv import load_dotenv
 
 class App:
-  
   def __init__(self) -> None:
-    pass
+      # Caricamento del file di configurazione
+      load_dotenv(".env")
   
   def run(self):
-    # crawler = Crawler()
-    # crawler.start()
-    FlaskServer("localhost", "8080").start()
+    logging.basicConfig(level=logging.NOTSET, format='[ %(name)s@%(module)s::%(funcName)s ] [ %(asctime)s ] [ %(levelname)s ] - %(message)s')
+    
+    FlaskServer("localhost", port="8080").start()
+    
+    # Queue Producer    
+    queues = {
+      "crawler/search_queue": Queue(),
+      "crawler/to_update" : Queue()
+    }
+    
+    redis = RedisAgent(**{
+              "host" : "localhost",
+              "port" : 6379,
+              "queues" : queues
+            })
+    
+    redis.start()
+    
+    # Queue Consumer
+    Crawler("RequestCrawler1", queues["crawler/search_queue"]).start()
+    Crawler("RequestCrawler2", queues["crawler/search_queue"]).start()
+    
     while True: pass
 
-  
 if __name__ == "__main__":
-    app = App()
-    app.run()
+  app = App()
+  app.run()
+  

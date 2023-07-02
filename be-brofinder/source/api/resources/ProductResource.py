@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from source.api.BaseResource import BaseResource
 
-from source.entities.Product import Product
+from source.database.mongodb.entities.Product import Product
 
 from source.api.dto.ProductDTO import ProductDTO
 

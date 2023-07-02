@@ -1,11 +1,11 @@
 from typing import List
 
-from source.entities.Review import Review
-from source.entities.Entity import Entity
+from source.database.mongodb.entities.Review import Review
+from source.database.mongodb.entities.Entity import Entity
 
 from bson.objectid import ObjectId
 
-from source.utils.MongoDB import MongoDB
+from source.database.mongodb.MongoDB import MongoDB
 
 from datetime import datetime, timedelta
 

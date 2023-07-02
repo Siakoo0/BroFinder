@@ -3,11 +3,15 @@ from redis import Redis
 from json import dumps, loads
 
 from source.api.BaseResource import BaseResource
-from source.utils.MongoDB import MongoDB
-
-from source.entities.Search import Search
-
 from source.api.dto.SearchDTO import SearchDTO
+
+from source.database.redis.RedisAgent import RedisAgent
+
+from source.database.mongodb.entities.Search import Search
+
+from flask_restful import inputs
+
+
 
 
 class SearchResource(BaseResource):
@@ -16,14 +20,7 @@ class SearchResource(BaseResource):
         return ('/api/search', )
     
     def publish(self, data):
-        # TODO: Da sostituire con .env
-
-        red = Redis("192.168.1.232", port=6379, charset="utf-8", decode_responses=True)
-        red.ping()
-        
-        red.lpush("search_queue", dumps(data, default=str))
-        
-        red.publish("crawler/search_queue", "New Item Loaded")
+        RedisAgent().publish("crawler/search_queue", dumps(data, default=str))
     
     def post(self):
         rules = {
@@ -45,7 +42,7 @@ class SearchResource(BaseResource):
                 "help" : "Il campo 'user' risulta essere obbligatorio, ma non è stato passato."
             },
             "forward" : {
-                "type" : bool,
+                "type" : inputs.boolean,
                 "default": False,
                 "location" : "form"
             },

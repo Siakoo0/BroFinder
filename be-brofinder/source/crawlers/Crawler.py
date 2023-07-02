@@ -2,16 +2,16 @@
     Crawler.py
 """
 
-import logging
 import glob
 
 from typing import List
 
 from importlib import import_module
 from inspect import isabstract
-from dotenv import load_dotenv
 
-from source.utils.Singleton import Singleton
+from source.utils.Logger import Logger
+
+from concurrent.futures import ThreadPoolExecutor
 from source.crawlers.scrapers.Scraper import Scraper
 
 # from tests.Test import TestSuite
@@ -19,23 +19,21 @@ from source.crawlers.scrapers.Scraper import Scraper
 from threading import Thread
 
 class Crawler(Thread):
-    """
-        Ciao mondo!
-    """
-
-    def __init__(self, name, excluded_classes = [
-            # "source.crawlers.scrapers.AmazonScraper",
-            "source.crawlers.scrapers.EbayScraper"
-        ]) -> None:
+    def __init__(self,
+                 name, 
+                 queue,
+                 excluded_classes = [
+                    # "source.crawlers.scrapers.AmazonScraper",
+                    "source.crawlers.scrapers.EbayScraper"
+                 ],
+                ) -> None:
 
         # Impostazione del logger ROOT ad un ascolto di qualsiasi tipologia di logger.
-        self.logger = logging.getLogger(name+"Logger")
-        self.logger.setLevel(logging.NOTSET)
+        self.logger = Logger.createLogger(name)
 
-        # Caricamento del file di configurazione
-        load_dotenv(".env")
 
-        self.scrapers = []
+        self.scrapers : List[Scraper] = []
+        self.queue = queue
         self.excluded_classes = excluded_classes
 
         self.loadScrapers()
@@ -65,15 +63,11 @@ class Crawler(Thread):
                 class_instance : Scraper  = my_class(self.logger)
                 self.scrapers.append(class_instance)
 
-
-    def start(self):
-        try:
-            # tests = TestSuite()
-            # tests.run()
-            print(self.scrapers)
+    def run(self):
+        while True:
+            item = self.queue.get()
+            self.logger.debug(f"Ho estratto l'elemento {item} da una coda con {self.queue.qsize()}")
             
-            for scraper in self.scrapers:
-                scraper.search("portatile")
-
-        except:
-            print("Errore avvenuto all'interno del codice.")
+            with ThreadPoolExecutor(len(self.scrapers)) as worker:
+                for scraper in self.scrapers:
+                    worker.submit(scraper.search, item)

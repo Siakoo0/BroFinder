@@ -1,16 +1,13 @@
-from collections.abc import Callable, Iterable, Mapping
 from threading import Thread
 from typing import Any
 
-from flask import Flask
-from flask_restful import Api, Resource
-
+from importlib import import_module
 import glob
 
-from importlib import import_module
+from flask import Flask
+from flask_restful import Api
 
-from source.api.BaseResource import BaseResource
-
+import logging
 
 class FlaskServer(Thread):
     def __init__(self, hostname, port) -> None:
@@ -18,13 +15,16 @@ class FlaskServer(Thread):
         self.port = port
         
         self.app = Flask(__name__)
+        
+        logging.getLogger("werkzeug").setLevel(logging.ERROR)
+        
         self.api = Api(self.app)
 
-        self.loadAPI()
+        self.load_api()
 
         Thread.__init__(self, daemon=True)
 
-    def loadAPI(self):
+    def load_api(self):
         excluded_classes = []
 
         for fname in glob.glob("./source/api/**/resources/*.py", recursive=True):
@@ -45,7 +45,6 @@ class FlaskServer(Thread):
                 class_name_string not in excluded_classes:
                 
                 resource = my_class()
-                print(resource.urls)
                 self.api.add_resource(resource, *resource.urls, endpoint=class_name_string)
 
     def run(self) -> None:
