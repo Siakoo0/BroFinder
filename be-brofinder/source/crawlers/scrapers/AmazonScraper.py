@@ -9,13 +9,11 @@ from typing import List
 
 from concurrent.futures import ThreadPoolExecutor
 
-from uuid import uuid4
-
 from source.crawlers.scrapers.Scraper import Scraper
 import json
 from random import randint
-from source.crawlers.entities.Product import Product
-from source.crawlers.entities.Review import Review
+from source.entities.Product import Product
+from source.entities.Review import Review
 
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
@@ -44,8 +42,9 @@ class AmazonScraper(Scraper):
 
         return [f"{base_url}&page={num}" for num in range(1, last_page)]
 
-    def search(self, product) -> str:
+    def search(self, product, logger) -> str:
         start = time.time()
+        
 
         loop = asyncio.new_event_loop()
 
@@ -85,7 +84,7 @@ class AmazonScraper(Scraper):
 
             product_links : List[str] = [self.base_url + product.get("href").split("/ref")[0] for product in product_links]
 
-            self.logger.info(f"Estrapolazione link completata con successo nell'url {url}.")
+            self.logger.info(f"Estrapolazione link completata con successo nell'url {url}, trovati {len(product_links)}.")
 
             fetched = len(product_links) > 0
 
@@ -126,7 +125,7 @@ class AmazonScraper(Scraper):
         self.logger.info("Inizio fetching prodotto {}".format(url))
 
         source = BeautifulSoup(source_page, "html.parser")
-        product_ent = Product.find(url)
+        product_ent = Product.get(url)
 
         if product_ent is not None and not product_ent.isExpired(15):
             return
@@ -231,7 +230,10 @@ class AmazonScraper(Scraper):
 
         product_info["price"] = float(product_info["price"].strip("€").replace(",", ".")) 
 
-        products.append(Product(**product_info, forceCreate=True))
+        prod = Product(**product_info)
+        prod.save()
+        
+        products.append(prod)
 
     async def startFetch(self, product):
 

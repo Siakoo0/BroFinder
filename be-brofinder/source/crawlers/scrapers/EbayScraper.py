@@ -3,8 +3,8 @@ from bs4 import BeautifulSoup, ResultSet, Tag
 
 from concurrent.futures import ThreadPoolExecutor
 
-from source.crawlers.entities.Product import Product
-from source.crawlers.entities.Review import Review
+from source.entities.Product import Product
+from source.entities.Review import Review
 from source.crawlers.scrapers.Scraper import Scraper 
 
 from urllib.parse import urlencode
@@ -58,7 +58,7 @@ class EbayScraper(Scraper):
         
         for product in product_links:
             with ThreadPoolExecutor(10) as pool:
-                prod = Product.find(product)
+                prod = Product.get(product)
                 if prod and prod.isExpired(15): continue
                 
                 pool.submit(self.extractInfoProduct, product, products_list, keyword)
@@ -146,9 +146,10 @@ class EbayScraper(Scraper):
                 product_info["reviews"] = None
             pool.submit(self.extractImages, page.text, product_info)
             
-        product_list.append(Product(**product_info))
-        
-        print(product_info)
+        prod = Product(**product_info)
+        prod.save()
+        product_list.append(prod)
+
         self.logger.info(f'Fine fetching del prodotto in {product_url}')
         
     def extractReviews(self, response, reviews : list, product_info: dict):

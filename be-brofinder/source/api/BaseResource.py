@@ -1,10 +1,14 @@
-from flask_restful import Resource
+from flask_restful import Resource, reqparse
 
-from flask_restful import reqparse
+from source.utils.MongoDB import MongoDB
 
 class BaseResource(Resource):
     __name__ = "NoName"
 
+    @property
+    def mongo(self):
+        return MongoDB()
+    
     @property
     def urls(self):
         return ()

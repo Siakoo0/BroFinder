@@ -3,7 +3,7 @@ from typing import List
 from requests import get
 
 from source.utils.UserAgentGenerator import UserAgentGenerator
-from source.crawlers.entities.Product import Product
+from source.entities.Product import Product
 
 from selenium import webdriver
 from selenium.webdriver import Chrome
@@ -12,8 +12,6 @@ from urllib.parse import urlencode
 from source.utils.Logger import Logger
 
 class Scraper(ABC):
-    logger = Logger.createLogger("ScraperLogger")
-
     @abstractmethod
     async def search(self, product: str) -> List[Product]:
         pass
@@ -22,6 +20,9 @@ class Scraper(ABC):
     @abstractmethod
     def base_url(self):
         pass
+
+    def __init__(self, logger) -> None:
+        self.logger = logger
 
     def prepareSearchURL(self, url : str, params : dict):
         return f"{url}?{urlencode(params)}"

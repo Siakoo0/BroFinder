@@ -44,8 +44,9 @@ class FlaskServer(Thread):
             if  "__" not in fname and \
                 class_name_string not in excluded_classes:
                 
-                resource : BaseResource  = my_class()
-                self.api.add_resource(resource, resource.urls)
+                resource = my_class()
+                print(resource.urls)
+                self.api.add_resource(resource, *resource.urls, endpoint=class_name_string)
 
     def run(self) -> None:
         self.app.run(**{

@@ -1,24 +1,26 @@
-from source.Crawler import Crawler
+from bson.objectid import ObjectId
 # import asyncio
 
+
+from source.entities.Search import Search
+
+from source.crawlers.Crawler import Crawler
+
 from source.api.FlaskServer import FlaskServer
-"""
-// Search
 
-const search = [
-  {
-    "id": 234567890,
-    "key" : "portatile macbook",
-    "datetime_pub": 12367213768362871
-  }
-]
 
-"""
+class App:
+  
+  def __init__(self) -> None:
+    pass
+  
+  def run(self):
+    # crawler = Crawler()
+    # crawler.start()
+    FlaskServer("localhost", "8080").start()
+    while True: pass
+
+  
 if __name__ == "__main__":
-    crawler = Crawler()
-    crawler.start()
-
-    FlaskServer("localhost", "80").start()
-
-    while True:
-      pass
+    app = App()
+    app.run()

@@ -1,23 +1,27 @@
+from datetime import datetime
+from redis import Redis
+from json import loads, dumps
+from dataclasses import dataclass
+
 from source.api.BaseResource import BaseResource
-from source.utils.MongoDB import MongoDB
 
+from source.entities.Product import Product
+
+from source.api.dto.ProductDTO import ProductDTO
+
+        
 class ProductResource(BaseResource):
-
-    @property
-    def mongo(self):
-        return MongoDB()
-
     @property
     def urls(self):
-        return ('/product')
+        return ('/api/product', )
     
     def get(self):
         rules = {
-            "key" : {
+            "text" : {
                 "type" : str,
                 "required" : True,
                 "location" : "args",
-                "help" : "Il campo 'key' risulta essere obbligatorio, ma non è stato passato."
+                "help" : "Il campo 'text' risulta essere obbligatorio, ma non è stato passato."
             },
             "filter" : {
                 "type" : str,
@@ -35,26 +39,28 @@ class ProductResource(BaseResource):
 
         args = self.validate(rules)
 
+        text = args["text"]
+        
         filters = {
-            "url" : {"url" :  args["key"]},
-            "name" : {"data.name" :  {"$regex" : f'.*{args["key"]}.*'}},
-            "key" : {"data.keyword": {"$regex" : f'.*{args["key"]}.*'}}
+            "url" : {"url" :  text},
+            "name" : {"data.name" :  {"$regex" : f'.*{text}.*'}},
+            "keyword" : {"data.keyword": {"$regex" : f'.*{text}.*'}}
         }
 
-        or_cond = [filters[filt] for filt in args["filter"].split(",")]
+        or_cond = [filters[filt] for filt in args["filter"].split(",") if filt in filters.keys()]
 
-        cond = {"$or" : or_cond}
+        filts = {}
+        
+        if len(or_cond) > 0:
+            filts["$or"] = or_cond
 
         if args["price"] > 0:
-            cond["price"] = {"$lte" : args['price']}
+            filts["price"] = {"$lte" : args['price']}
 
-        products = []
-
-        for product in self.mongo.collection("products").find(cond):
-            del product["data"][-1]["_id"]
-
-            product["data"][-1]["created_at"] = product["data"][-1]["created_at"].isoformat() 
-
-            products.append(product["data"][-1])
+        products = Product.getAll(filts)
         
-        return products, 200
+        dto = ProductDTO()
+        
+        serializer = lambda product: dto.build(**product["data"][-1])
+        
+        return list(map(serializer, products)), 200

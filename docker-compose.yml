@@ -21,4 +21,9 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=siakoo
       - MONGO_INITDB_ROOT_PASSWORD=password
-    
+  redis:
+    container_name: redis
+    image: redis:alpine3.18
+    restart: always
+    ports:
+      - 6379:6379
