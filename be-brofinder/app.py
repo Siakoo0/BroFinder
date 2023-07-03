@@ -25,17 +25,10 @@ class App:
       "crawler/to_update" : Queue()
     }
     
-    redis = RedisAgent(**{
-              "host" : "localhost",
-              "port" : 6379,
-              "queues" : queues
-            })
-    
-    redis.start()
-    
     # Queue Consumer
     Crawler("RequestCrawler1", queues["crawler/search_queue"]).start()
-    Crawler("RequestCrawler2", queues["crawler/search_queue"]).start()
+    Crawler("UpdateCrawler1", queues["crawler/to_update"]).start()
+    Crawler("UpdateCrawler2", queues["crawler/to_update"]).start()
     
     while True: pass
 
