@@ -1,4 +1,4 @@
-from source.utils.Singleton import Singleton
+from source.helpers.Singleton import Singleton
 
 from pymongo import MongoClient
 from os import getenv

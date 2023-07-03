@@ -38,10 +38,11 @@ class AmazonScraper(Scraper):
 
         return [f"{base_url}&page={num}" for num in range(1, last_page)]
 
-    def search(self, product, logger) -> str:
+    def search(self, product) -> str:
         start = time.time()
         
-
+        # Da migliorare la search
+        
         loop = asyncio.new_event_loop()
 
         loop.run_until_complete(self.startFetch(product))
@@ -141,6 +142,7 @@ class AmazonScraper(Scraper):
 
         info_selector = {
             "name" : ["#productTitle"],
+            # Price bug, se non trova nulla non può convertire
             "price" : ["#apex_desktop span.a-price .a-offscreen", "#price"],
             "description" : ["#feature-bullets ul", "#bookDescription_feature_div"],
             "reviews_summary" : ['.AverageCustomerReviews span[data-hook="rating-out-of-text"]']
@@ -232,7 +234,6 @@ class AmazonScraper(Scraper):
         products.append(prod)
 
     async def startFetch(self, product):
-
         params : dict = {"k" : product}
         url : str = self.prepareSearchURL(self.base_url + "/s", params)
 
@@ -240,25 +241,24 @@ class AmazonScraper(Scraper):
 
         while not fetched:
             try:
-                chrome = self.getChromeInstance()
-                chrome.get(url)
-                pages = self.__fetchPages(chrome.page_source, url)
-                chrome.close()
+                pages = self.__fetchPages(self.getPageSource(url), url)
                 fetched = True
             except:
                 wait_time = randint(2, 4)
                 self.logger.info(f"Fetching fallito, riprovo a fare la richiesta tra {wait_time} secondi.")
                 time.sleep(wait_time)
 
-        async with aiohttp.ClientSession(headers=self.getHeaders()) as session:
-            self.logger.info(msg="Generazione delle richieste associate alle pagine.")
+        futures = []
 
-            pages_task = [asyncio.create_task(session.get(page)) for page in pages]
-            results = await asyncio.gather(*pages_task)
+        self.logger.info(msg="Generazione delle richieste associate alle pagine.")
 
-            self.logger.info("Richieste eseguite, conversione in sorgente html.")
+        with ThreadPoolExecutor(4) as pool:
+            for page in pages:
+                futures.append(pool.submit(self.getPageSource, page))
 
-            pages = [(await page.text(), str(page.url), product) for page in results]
+        self.logger.info("Richieste eseguite, conversione in sorgente html.")
+
+        pages = [(future.result(), url, product) for future in futures]
 
         self.logger.info("Terminata conversione, inizio analisi ed estrapolazione delle pagine.")
 

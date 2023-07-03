@@ -55,7 +55,8 @@ class SearchResource(BaseResource):
         
         args = self.validate(rules)
         
-        Search(**args).save(self.publish)
+        # TODO: Search(**args).save(self.publish)
+        self.publish({"text": args["text"]})
         
         return {
             "ok" : "Search Request generated"

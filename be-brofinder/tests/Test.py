@@ -2,7 +2,7 @@ import unittest
 from unittest.suite import TestSuite
 from unittest import TestCase
 
-from source.utils.Singleton import Singleton
+from source.helpers.Singleton import Singleton
 
 class TestSuite(metaclass=Singleton):
     def __init__(self) -> None:
