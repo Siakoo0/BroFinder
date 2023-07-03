@@ -29,7 +29,7 @@ class EbayScraper(Scraper):
         
         response = self.request(url)
         
-        pages = self._fetchPages(response, 4) #esegue il fetch di 4 pagine di prodotti
+        pages = self._fetchPages(response, 3) #esegue il fetch di 4 pagine di prodotti
 
         #Array che conterra tutti i prodotti
         products = []
@@ -59,7 +59,7 @@ class EbayScraper(Scraper):
         for product in product_links:
             with ThreadPoolExecutor(10) as pool:
                 prod = Product.get(product)
-                if prod and prod.isExpired(15): continue
+                if prod and prod.isExpired(): continue
                 
                 pool.submit(self.extractInfoProduct, product, products_list, keyword)
             

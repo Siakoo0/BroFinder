@@ -7,24 +7,23 @@ import glob
 from flask import Flask
 from flask_restful import Api
 
-import logging
+from source.api.BaseResource import BaseResource
 
 class FlaskServer(Thread):
-    def __init__(self, hostname, port) -> None:
+    def __init__(self, hostname, port, queues) -> None:
         self.hostname = hostname
         self.port = port
+        self.queues = queues
         
         self.app = Flask(__name__)
         
-        logging.getLogger("werkzeug").setLevel(logging.ERROR)
-        
         self.api = Api(self.app)
 
-        self.load_api()
+        self.loadAPI()
 
         Thread.__init__(self, daemon=True)
 
-    def load_api(self):
+    def loadAPI(self):
         excluded_classes = []
 
         for fname in glob.glob("./source/api/**/resources/*.py", recursive=True):
@@ -38,14 +37,20 @@ class FlaskServer(Thread):
             module = import_module(class_name_string)
 
             # Prelevo la classe dal modulo e la istanzio se non è astratta
-            my_class = getattr(module, class_name_string.split(".")[-1])
+            resource = getattr(module, class_name_string.split(".")[-1])
 
             # Se non è una classe astratta
             if  "__" not in fname and \
                 class_name_string not in excluded_classes:
                 
-                resource = my_class()
-                self.api.add_resource(resource, *resource.urls, endpoint=class_name_string)
+                self.api.add_resource(
+                    resource, 
+                    *resource().urls, 
+                    endpoint=class_name_string, 
+                    resource_class_kwargs={
+                        "queues":self.queues
+                    }
+                )
 
     def run(self) -> None:
         self.app.run(**{

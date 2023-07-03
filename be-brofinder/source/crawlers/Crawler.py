@@ -14,14 +14,20 @@ from source.crawlers.scrapers.Scraper import Scraper
 
 from threading import Thread
 
+class CrawlerMode:
+    SEARCH = 1
+    FETCH_URL = 2
+
 class Crawler(Thread):
     def __init__(self,
                  name, 
                  queue,
                  excluded_classes = [
                     # "source.crawlers.scrapers.AmazonScraper",
+                    "source.crawlers.scrapers.AmazonScraperOld",
                     "source.crawlers.scrapers.EbayScraper"
                  ],
+                 mode: CrawlerMode = CrawlerMode.SEARCH,
                 ) -> None:
 
         # Impostazione del logger ROOT ad un ascolto di qualsiasi tipologia di logger.
@@ -31,6 +37,8 @@ class Crawler(Thread):
         
         self.queue = queue
         self.excluded_classes = excluded_classes
+        
+        self.mode = mode        
 
         self.loadScrapers()
         
@@ -50,21 +58,22 @@ class Crawler(Thread):
             module = import_module(class_name_string)
 
             # Prelevo la classe dal modulo e la istanzio se non è astratta
-            my_class = getattr(module, class_name_string.split(".")[-1])
+            scraper = getattr(module, class_name_string.split(".")[-1])
 
             # Se non è una classe astratta
-            if  not isabstract(my_class) and \
+            if  not isabstract(scraper) and \
                 "__" not in fname and \
                 class_name_string not in self.excluded_classes:
-                class_instance : Scraper  = my_class(self.logger)
+                class_instance : Scraper  = scraper(self.logger)
                 self.scrapers.append(class_instance)
 
     def run(self):
         while True:
             item = self.queue.get()
-            self.logger.debug(f"Ho estratto l'elemento {item} da una coda con {self.queue.qsize()}")
             
-            with ThreadPoolExecutor(len(self.scrapers)) as worker:
+            with ThreadPoolExecutor(2) as worker:
                 for scraper in self.scrapers:
-                    worker.submit(scraper.search, item["text"])
-                    self.logger.debug("Lo scraper è partito")
+                    if self.mode == CrawlerMode.SEARCH:
+                        worker.submit(scraper.search, item["text"])
+                    elif self.mode == CrawlerMode.FETCH_URL and scraper.base_url in item["url"]:
+                        worker.submit(scraper.extractProduct, item)

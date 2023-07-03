@@ -5,13 +5,10 @@ from json import dumps, loads
 from source.api.BaseResource import BaseResource
 from source.api.dto.SearchDTO import SearchDTO
 
-from source.database.redis.RedisAgent import RedisAgent
 
 from source.database.mongodb.entities.Search import Search
 
 from flask_restful import inputs
-
-
 
 
 class SearchResource(BaseResource):
@@ -19,8 +16,8 @@ class SearchResource(BaseResource):
     def urls(self):
         return ('/api/search', )
     
-    def publish(self, data):
-        RedisAgent().publish("crawler/search_queue", dumps(data, default=str))
+    def enqueue(self, data):
+        self.queues["crawler/search_queue"].put(data)
     
     def post(self):
         rules = {
@@ -55,8 +52,8 @@ class SearchResource(BaseResource):
         
         args = self.validate(rules)
         
-        # TODO: Search(**args).save(self.publish)
-        self.publish({"text": args["text"]})
+        # TODO: Search(**args).save(self.enqueue)
+        self.enqueue({"text": args["text"]})
         
         return {
             "ok" : "Search Request generated"

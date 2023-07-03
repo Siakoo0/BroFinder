@@ -15,6 +15,10 @@ from random import randint
 from source.database.mongodb.entities.Product import Product
 from source.database.mongodb.entities.Review import Review
 
+from timeit import timeit
+
+
+import uuid
 
 class AmazonScraper(Scraper):
     """
@@ -25,56 +29,34 @@ class AmazonScraper(Scraper):
     def base_url(self):
         return "https://www.amazon.it"
 
-    def request(self, url, headers : dict = {}):
-        headers = self.getHeaders() | headers
-
-        return super().request(url, headers)
-
-    def __fetchPages(self, response, base_url):
-        bs = BeautifulSoup(response, "html.parser")
-        last_page = bs.select(".s-pagination-item")[-2].getText()
-
-        last_page = min(5, int(last_page)+1)
-
-        return [f"{base_url}&page={num}" for num in range(1, last_page)]
-
-    def search(self, product) -> str:
-        start = time.time()
+    def search(self, k_product):
+        params : dict = {"k" : k_product}
         
-        # Da migliorare la search
+        url : str = self.prepareSearchURL(self.base_url + "/s", params)
+
+        urls = [f"{url}&page={num}" for num in range(2, 4)]
+        urls.insert(0, url)
         
-        loop = asyncio.new_event_loop()
-
-        loop.run_until_complete(self.startFetch(product))
-
-        loop.close()
-
-        end = time.time()
-
-        print("Tempo impiegato: {}s".format(end - start))
-
-    def getHeaders(self):
-        headers = {
-            'User-Agent': self.user_agent(),
-            'Accept-Language': 'en-US, en;q=0.5'
-        }
-        return headers
-
-    def extractFromPage(self, response, url, search_text):
-        async def getProductsSource(prods : List[str]):
-            async with aiohttp.ClientSession(headers=self.getHeaders()) as req:
-                prods_task = [asyncio.create_task(req.get(prod)) for prod in prods]
-
-                prods_result = await asyncio.gather(*prods_task)
-
-                prods_source = [(await prod.text(), str(prod.url), search_text)for prod in prods_result]
-
-            return prods_source
-
+        with ThreadPoolExecutor(len(urls)) as workers:
+            pages = workers.map(self.getPageSource, urls)
+            pages = list(pages)
+            
+            products_links = workers.map(self.extractFromPage, pages)
+            products_links = [item for items in list(products_links) for item in items]
+            
+        with ThreadPoolExecutor(min(15, len(products_links))) as workers:
+            product_pages = workers.map(self.getPageSource, products_links)
+            product_pages = list(product_pages)
+            
+            for product in product_pages:
+                workers.submit(self.scrapeProduct, product, k_product)
+        
+    def extractFromPage(self, page):
+        url, response = page
         fetched = False  
         sleep_time = 0
-
-        while not fetched and sleep_time < 5:
+        
+        while not fetched and sleep_time < 10:
             bs : BeautifulSoup = BeautifulSoup(response, "html.parser")
 
             product_links : ResultSet[Tag] = bs.select('[data-component-type="s-search-results"] [data-asin]:not([data-asin=""]) h2 a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal[href*="/dp/"]')
@@ -88,58 +70,38 @@ class AmazonScraper(Scraper):
             if not fetched:
                 sleep_time+=5
                 time.sleep(sleep_time)
-                response = self.request(url).text
+                response = self.getPageSource(url)
 
-        if not fetched: return
-
-        # Avvio del loop Async
-
-        loop = asyncio.new_event_loop()
-        products_source = loop.run_until_complete(getProductsSource(product_links))
-        loop.close()
-
-        results = []
-
-        with ThreadPoolExecutor(10) as pool:
-            for product in products_source:
-                pool.submit(self.fetchProduct, results, *product)
-
-    def fetchProduct(self, products : list, source_page : str, url : str, product_search):
-        def getReviewsSource():
-            reviews_url = re.sub("\/dp\/", "/product-reviews/", url)
-            self.logger.info(f"Preparazione URL per fetching Recensioni del prodotto {url}")
-
-            chrome = self.getChromeInstance()
-            chrome.get(reviews_url)
-            page = chrome.page_source
-            try:
-                chrome.close()            
-            except:
-                pass
-
-            return page
-
-        self.logger.info("Inizio fetching prodotto {}".format(url))
-
-        source = BeautifulSoup(source_page, "html.parser")
-        product_ent = Product.get(url)
-
-        if product_ent is not None and not product_ent.isExpired(15):
+        if not fetched: return ()
+        
+        return product_links
+    
+    def extractProduct(self, data):
+        product_ent = Product.get(data["url"])
+        
+        if product_ent is not None and not product_ent.isExpired():
             return
+   
+        self.scrapeProduct(self.getPageSource(data["url"]), data["keyword"]) 
+    
+    def scrapeProduct(self, product_page, keyword):
+        url, source = product_page
+        
+        product_ent = Product.get(url)
+        
+        if product_ent is not None and not product_ent.isExpired():
+            return
+        
+        self.logger.info("Inizio fetching prodotto {}".format(url))
+        source = BeautifulSoup(source, "html.parser")
 
         product_info = {
             "url" : url,
-            "reviews" : [],
-            "images" : [],
-            "keyword": product_search
-        }
-
-        info = {
-            "url" : url,
+            "keyword": keyword,
             "reviews" : [],
             "images" : []
         }
-
+        
         info_selector = {
             "name" : ["#productTitle"],
             # Price bug, se non trova nulla non può convertire
@@ -147,26 +109,7 @@ class AmazonScraper(Scraper):
             "description" : ["#feature-bullets ul", "#bookDescription_feature_div"],
             "reviews_summary" : ['.AverageCustomerReviews span[data-hook="rating-out-of-text"]']
         }
-
-        def extractData():
-            for key in info_selector.keys():
-                possible_tags = info_selector[key]
-                foundBool = False
-
-                for selector in possible_tags:
-                    product_info[key] : Tag = source.select_one(selector)
-
-                    if product_info[key]:
-                        foundBool = True
-                        product_info[key] : str = product_info[key].text.strip()
-                        product_info[key] = re.sub(' +', ' ', product_info[key])
-                        info[key] = re.sub(' +', ' ', product_info[key])
-                        break
-
-                    if not foundBool:
-                        product_info[key] = ""
-                        info[key] = ""
-
+        
         def extractImages():
             checkScriptTag = lambda elem: 'm.media-amazon.com/images' in elem.text
 
@@ -189,79 +132,76 @@ class AmazonScraper(Scraper):
                         key = prior_to_extract[index_key]
 
                     product_info["images"].append(img[key])
-                    info["images"].append(img[key])
+                    
+        def extractData():
+            for key in info_selector.keys():
+                possible_tags = info_selector[key]
+                foundBool = False
 
-        def extractReviews(rev_page, url, reviews : list):
-            source = BeautifulSoup(rev_page, "html.parser")
+                for selector in possible_tags:
+                    product_info[key] : Tag = source.select_one(selector)
+
+                    if product_info[key]:
+                        foundBool = True
+                        product_info[key] : str = product_info[key].text.strip()
+                        product_info[key] = re.sub(' +', ' ', product_info[key])
+                        break
+
+                    if not foundBool:
+                        product_info[key] = None
+
+        def getReviewsSource(url):
+            self.logger.info(f"Preparazione URL per fetching Recensioni del prodotto {url}")
+            reviews_url = re.sub("\/dp\/", "/product-reviews/", url)
+            
+            url, page_source = self.getPageSource(reviews_url)
+            source = BeautifulSoup(page_source, "html.parser")
+            
             reviews_elems = source.select('[data-hook="review"]')
-
             has_reviews = len(reviews_elems) > 0
 
-            if not has_reviews: return
+            if not has_reviews: 
+                return
 
             self.logger.info("Per l'URL {} ho trovato {} recensioni".format(url, len(reviews_elems)))
 
-            for rev in reviews_elems:
-                regex_vote = re.compile("^a-star-[1-5]$")
+            with ThreadPoolExecutor(10) as pool:
+                reviews = pool.map(extractReview, reviews_elems)
+                reviews = list(reviews)
+                
+            for review in reviews: product_info["reviews"].append(Review(**review))
+                
+        def extractReview(rev):
+            regex_vote = re.compile("^a-star-[1-5]$")
 
-                vote_html_elem = rev.select_one(".a-icon-star").get("class")
-                vote = list(filter(regex_vote.match, vote_html_elem))[0].split("-")[-1]
+            vote_html_elem = rev.select_one(".a-icon-star").get("class")
+            vote = list(filter(regex_vote.match, vote_html_elem))[0].split("-")[-1]
 
-                review_dict = {
-                    "text" : rev.select_one(".review-text").getText().strip().strip("\n"),
-                    "vote" : int(vote),
-                    "media" : [
-                        image.get("src").replace("_SY88", "_SL1600_") for image in rev.select('.review-image-tile')
-                    ],
-                    "date" : rev.select_one('[data-hook="review-date"]').getText().split(" il ")[-1].strip().strip("\n")
-                }
+            review_dict = {
+                "text" : rev.select_one(".review-text").getText().strip().strip("\n"),
+                "vote" : int(vote),
+                "media" : [
+                    image.get("src").replace("_SY88", "_SL1600_") for image in rev.select('.review-image-tile')
+                ],
+                "date" : rev.select_one('[data-hook="review-date"]').getText().split(" il ")[-1].strip().strip("\n")
+            }
 
-                reviews.append(Review(**review_dict))
-                info['reviews'].append(review_dict)
+            return review_dict
             
-        review = getReviewsSource()
-
         with ThreadPoolExecutor(max_workers=10) as pool:
             pool.submit(extractData)
             pool.submit(extractImages)
-            pool.submit(extractReviews, review, url, product_info["reviews"])
-
-        product_info["price"] = float(product_info["price"].strip("€").replace(",", ".")) 
-
+            pool.submit(getReviewsSource, url)
+            
+        try:
+            product_info["reviews_summary"] = product_info["reviews_summary"].replace(" su ", "/")
+        except:
+            product_info["reviews_summary"] = None
+            
+        try:
+            product_info["price"] = float(product_info["price"].strip("€").replace(",", ".")) 
+        except:
+            product_info["price"] = None
+            
         prod = Product(**product_info)
         prod.save()
-        
-        products.append(prod)
-
-    async def startFetch(self, product):
-        params : dict = {"k" : product}
-        url : str = self.prepareSearchURL(self.base_url + "/s", params)
-
-        fetched = False
-
-        while not fetched:
-            try:
-                pages = self.__fetchPages(self.getPageSource(url), url)
-                fetched = True
-            except:
-                wait_time = randint(2, 4)
-                self.logger.info(f"Fetching fallito, riprovo a fare la richiesta tra {wait_time} secondi.")
-                time.sleep(wait_time)
-
-        futures = []
-
-        self.logger.info(msg="Generazione delle richieste associate alle pagine.")
-
-        with ThreadPoolExecutor(4) as pool:
-            for page in pages:
-                futures.append(pool.submit(self.getPageSource, page))
-
-        self.logger.info("Richieste eseguite, conversione in sorgente html.")
-
-        pages = [(future.result(), url, product) for future in futures]
-
-        self.logger.info("Terminata conversione, inizio analisi ed estrapolazione delle pagine.")
-
-        with ThreadPoolExecutor(5) as pool:
-            for page in pages:
-                pool.submit(self.extractFromPage, *page)

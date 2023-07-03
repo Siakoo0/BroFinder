@@ -1,12 +1,14 @@
 from source.api.FlaskServer import FlaskServer
-from source.crawlers.Crawler import Crawler
-from source.database.redis.RedisAgent import RedisAgent
+from source.crawlers.Crawler import Crawler, CrawlerMode
+
+from source.helpers.Updater import Updater
 
 from dotenv import load_dotenv
 
 from queue import Queue
 import logging
 
+from requests import post
 
 class App:
   def __init__(self) -> None:
@@ -14,20 +16,51 @@ class App:
       load_dotenv(".env")
   
   def run(self):
-    # logging.basicConfig(level=logging.NOTSET, format='[ %(name)s@%(module)s::%(funcName)s ] [ %(asctime)s ] [ %(levelname)s ] - %(message)s')
-
-    FlaskServer("localhost", port="8080").start()
-    
-    # Queue Producer    
+    # Queue    
     queues = {
-      "crawler/search_queue": Queue()
+      "crawler/search_queue": Queue(),
+      "crawler/updater": Queue()
     }
     
-    # Queue Consumer
-    Crawler("RequestCrawler1", queues["crawler/search_queue"]).start()
-    Crawler("UpdateCrawler1", queues["crawler/to_update"]).start()
-    Crawler("UpdateCrawler2", queues["crawler/to_update"]).start()
+    # Queue Producer
+    flask = FlaskServer("localhost", "8080", queues)
+    flask.start()
     
+    # Product Updater
+    updater = Updater(queues["crawler/updater"])
+    updater.start()
+    
+    # Queue Consumer
+    crawlers = [
+      Crawler(
+        "RequestCrawler1", 
+        queues["crawler/search_queue"]
+      ),
+      Crawler(
+        "RequestCrawler2", 
+        queues["crawler/search_queue"]
+      ),
+      Crawler(
+        "UpdaterCrawler", 
+        queues["crawler/updater"], 
+        mode=CrawlerMode.FETCH_URL
+      ),
+      Crawler(
+        "UpdaterCrawler1", 
+        queues["crawler/updater"], 
+        mode=CrawlerMode.FETCH_URL
+      )
+    ]
+    
+    for crawler in crawlers:
+      crawler.start()
+    
+    # post("http://localhost:8080/api/search", data={
+    #   "text" : "iphone 6",
+    #   "user" : 199791044,
+    #   "forward" : True
+    # })
+        
     while True: pass
 
 if __name__ == "__main__":

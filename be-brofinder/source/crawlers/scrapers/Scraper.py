@@ -39,10 +39,14 @@ class Scraper(ABC):
 
     def getPageSource(self, url):
         chrome = self.getChromeInstance()
-        chrome.get(url)
-        page = chrome.page_source
-        chrome.close()
-        return page
+        try:
+            chrome.get(url)
+            page = chrome.page_source
+            
+            return (url, page)
+        except: pass
+        finally: 
+            chrome.close()
         
     def getChromeInstance(self) -> Chrome:
         options = webdriver.ChromeOptions()

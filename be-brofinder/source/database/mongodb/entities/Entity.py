@@ -40,7 +40,7 @@ class Entity(ABC):
 
     @classmethod
     def getAll(self, params):
-        entities = list(MongoDB().collection(self.collection()).find(params))
+        entities = MongoDB().collection(self.collection()).find(params)
         return list(entities)
 
     def update(self,  new_entity, search_param = {}):
@@ -51,6 +51,7 @@ class Entity(ABC):
             
         if saved_entity is not None:
             new_entity["updated_at"] = datetime.now()
+            del new_entity["_id"]
 
             MongoDB().collection(self.collection()).update_one(
                 search_param,
