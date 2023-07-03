@@ -1,13 +1,12 @@
-from source.crawlers.Crawler import Crawler
 from source.api.FlaskServer import FlaskServer
-
+from source.crawlers.Crawler import Crawler
 from source.database.redis.RedisAgent import RedisAgent
-from queue import Queue
-
-from threading import Thread
-import logging
 
 from dotenv import load_dotenv
+
+from queue import Queue
+import logging
+
 
 class App:
   def __init__(self) -> None:
@@ -15,14 +14,13 @@ class App:
       load_dotenv(".env")
   
   def run(self):
-    logging.basicConfig(level=logging.NOTSET, format='[ %(name)s@%(module)s::%(funcName)s ] [ %(asctime)s ] [ %(levelname)s ] - %(message)s')
-    
+    # logging.basicConfig(level=logging.NOTSET, format='[ %(name)s@%(module)s::%(funcName)s ] [ %(asctime)s ] [ %(levelname)s ] - %(message)s')
+
     FlaskServer("localhost", port="8080").start()
     
     # Queue Producer    
     queues = {
-      "crawler/search_queue": Queue(),
-      "crawler/to_update" : Queue()
+      "crawler/search_queue": Queue()
     }
     
     # Queue Consumer

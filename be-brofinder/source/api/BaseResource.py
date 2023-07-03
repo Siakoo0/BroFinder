@@ -14,7 +14,7 @@ class BaseResource(Resource):
         return ()
     
     def __getParser(self, rules : dict):
-        parser = reqparse.RequestParser()
+        parser = reqparse.RequestParser(bundle_errors=True)
 
         for field, rule in rules.items():
             parser.add_argument(field, **rule)

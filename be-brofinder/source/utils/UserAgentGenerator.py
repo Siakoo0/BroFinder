@@ -1,6 +1,6 @@
 from random import choice
 
-from source.utils.Singleton import Singleton
+from source.helpers.Singleton import Singleton
 
 class UserAgentGenerator(metaclass=Singleton):
     __user_agents = {}

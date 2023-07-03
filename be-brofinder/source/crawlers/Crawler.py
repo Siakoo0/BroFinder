@@ -1,7 +1,3 @@
-"""
-    Crawler.py
-"""
-
 import glob
 
 from typing import List
@@ -31,8 +27,8 @@ class Crawler(Thread):
         # Impostazione del logger ROOT ad un ascolto di qualsiasi tipologia di logger.
         self.logger = Logger.createLogger(name)
 
-
         self.scrapers : List[Scraper] = []
+        
         self.queue = queue
         self.excluded_classes = excluded_classes
 
@@ -70,4 +66,5 @@ class Crawler(Thread):
             
             with ThreadPoolExecutor(len(self.scrapers)) as worker:
                 for scraper in self.scrapers:
-                    worker.submit(scraper.search, item)
+                    worker.submit(scraper.search, item["text"])
+                    self.logger.debug("Lo scraper è partito")

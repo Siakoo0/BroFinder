@@ -37,10 +37,17 @@ class Scraper(ABC):
 
         return get(url, headers=__headers)
 
+    def getPageSource(self, url):
+        chrome = self.getChromeInstance()
+        chrome.get(url)
+        page = chrome.page_source
+        chrome.close()
+        return page
+        
     def getChromeInstance(self) -> Chrome:
         options = webdriver.ChromeOptions()
         
-        options.add_argument("--headless=new")
+        # options.add_argument("--headless=new")
         options.add_argument('window-size=1920x1080')
         options.add_argument("disable-gpu")
         options.add_argument("--log-level=3")
