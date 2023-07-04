@@ -1,6 +1,8 @@
 from source.api.FlaskServer import FlaskServer
 from source.crawlers.Crawler import Crawler, CrawlerMode
 
+from source.database.mongodb.entities.Product import Product
+
 from source.helpers.Updater import Updater
 
 from dotenv import load_dotenv

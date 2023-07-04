@@ -60,24 +60,12 @@ class Product(Entity):
         now = datetime.now()
         return now - self.created_at > timedelta(minutes=minutes)
 
-    def setScheduledUpdate(self, schedule):
-        saved_entity = self.find({"url": self.url})
-        
-        if not schedule and "scheduled_update" in saved_entity.keys():
-            del saved_entity["scheduled_update"]
-        else:
-            saved_entity["scheduled_update"] = schedule
-            
-        self.update(saved_entity)
-
-
     def save(self):
         entity = self.convert()
 
         saved_entity = self.find({"url": self.url})
 
         if saved_entity is not None:
-            self.setScheduledUpdate(False)
             saved_entity["data"].append(entity)
             self.update(saved_entity)
         else:

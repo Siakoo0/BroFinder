@@ -82,7 +82,10 @@ class AmazonScraper(Scraper):
         if product_ent is not None and not product_ent.isExpired():
             return
    
-        self.scrapeProduct(self.getPageSource(data["url"]), data["keyword"]) 
+        self.scrapeProduct(self.getPageSource(data["url"]), data["data"][0]["keyword"]) 
+        
+        
+        self.logger.info(f"Estrazione del prodotto completata.")
     
     def scrapeProduct(self, product_page, keyword):
         url, source = product_page
@@ -205,3 +208,5 @@ class AmazonScraper(Scraper):
             
         prod = Product(**product_info)
         prod.save()
+        
+        self.logger.debug(f"Terminata la fase di fetching del prodotto {product_info['url']}")

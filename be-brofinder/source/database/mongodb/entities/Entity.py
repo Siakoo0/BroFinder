@@ -52,10 +52,13 @@ class Entity(ABC):
         if saved_entity is not None:
             new_entity["updated_at"] = datetime.now()
             del new_entity["_id"]
-
-            MongoDB().collection(self.collection()).update_one(
-                search_param,
-                {"$set" : new_entity}
+            
+            # Il prodotto è stato aggiornato
+            if "scheduled_update" in new_entity.keys():
+                del new_entity["scheduled_update"];
+                
+            MongoDB().collection(self.collection()).replace_one(
+                search_param, new_entity
             )
       
     def get(self):

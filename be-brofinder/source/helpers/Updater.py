@@ -15,29 +15,29 @@ class Updater(Thread):
         
     def run(self):
         while True:
+            self.logger.debug(f"Prendo tutti i prodotti scaduti da oltre {ProductParams.EXPIRATION_TIME} minuti.")
             expire_date = datetime.now() - timedelta(minutes=ProductParams.EXPIRATION_TIME)
             
             prods = Product.getAll(
                 {
-                    "scheduled_update" : {"$eq" : None},
                     "updated_at" : {"$lt" : expire_date}
                 }
-            )[:25]
+            )[:75]
             
             # Limito il numero di risultati a 25 in maniera da partizionare il lavoro a turni
-            # BUG CREA DUPLICATI
             
             for prod in prods:
                 prod_ent = Product.get(prod["url"])
-                prod_ent.setScheduledUpdate(True)
+                prod["scheduled_fetch"] = True
+                prod_ent.update(prod)
                 
-                self.queue.put(prod_ent.convert())
+                self.queue.put(prod)
                 
                 self.logger.debug("Il prodotto {} è stato schedulato per l'aggiornamento.".format(prod["url"]))
                 
                 
-            time.sleep(60*10)
-            
             self.logger.debug("Ripresa tra 5 minuti dell'aggiornamento dei prodotti.")
+            time.sleep(60*5)
+            
             
             

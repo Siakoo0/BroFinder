@@ -51,7 +51,7 @@ class Scraper(ABC):
     def getChromeInstance(self) -> Chrome:
         options = webdriver.ChromeOptions()
         
-        # options.add_argument("--headless=new")
+        options.add_argument("--headless=new")
         options.add_argument('window-size=1920x1080')
         options.add_argument("disable-gpu")
         options.add_argument("--log-level=3")
