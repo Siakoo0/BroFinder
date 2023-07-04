@@ -28,8 +28,10 @@ class Updater(Thread):
             
             for prod in prods:
                 prod_ent = Product.get(prod["url"])
+                prod["_id"] = prod_ent._id
                 prod["scheduled_fetch"] = True
-                prod_ent.update(prod)
+                
+                prod_ent.update(prod, {}, False)
                 
                 self.queue.put(prod)
                 

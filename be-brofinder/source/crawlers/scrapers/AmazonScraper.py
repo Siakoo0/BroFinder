@@ -77,14 +77,7 @@ class AmazonScraper(Scraper):
         return product_links
     
     def extractProduct(self, data):
-        product_ent = Product.get(data["url"])
-        
-        if product_ent is not None and not product_ent.isExpired():
-            return
-   
         self.scrapeProduct(self.getPageSource(data["url"]), data["data"][0]["keyword"]) 
-        
-        
         self.logger.info(f"Estrazione del prodotto completata.")
     
     def scrapeProduct(self, product_page, keyword):
@@ -97,7 +90,6 @@ class AmazonScraper(Scraper):
         
         self.logger.info("Inizio fetching prodotto {}".format(url))
         source = BeautifulSoup(source, "html.parser")
-
         product_info = {
             "url" : url,
             "keyword": keyword,

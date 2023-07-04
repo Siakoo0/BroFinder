@@ -43,19 +43,21 @@ class Entity(ABC):
         entities = MongoDB().collection(self.collection()).find(params)
         return list(entities)
 
-    def update(self,  new_entity, search_param = {}):
+    def update(self,  new_entity, search_param = {}, updated_at=True):
         if len(search_param.keys()) == 0:
             search_param["_id"] = new_entity["_id"]
             
         saved_entity = self.find(search_param)
             
         if saved_entity is not None:
-            new_entity["updated_at"] = datetime.now()
+            if updated_at:
+                new_entity["updated_at"] = datetime.now()
+            
             del new_entity["_id"]
             
             # Il prodotto è stato aggiornato
-            if "scheduled_update" in new_entity.keys():
-                del new_entity["scheduled_update"];
+            if "scheduled_fetch" in new_entity.keys() and not new_entity["scheduled_fetch"]:
+                del new_entity["scheduled_fetch"];
                 
             MongoDB().collection(self.collection()).replace_one(
                 search_param, new_entity

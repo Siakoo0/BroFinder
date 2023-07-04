@@ -67,6 +67,7 @@ class Product(Entity):
 
         if saved_entity is not None:
             saved_entity["data"].append(entity)
+            saved_entity["scheduled_fetch"] = False
             self.update(saved_entity)
         else:
             super().save({
