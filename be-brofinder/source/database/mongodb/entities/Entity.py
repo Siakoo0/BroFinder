@@ -49,10 +49,7 @@ class Entity(ABC):
             
         saved_entity = self.find(search_param)
             
-        if saved_entity is not None:
-            if updated_at:
-                new_entity["updated_at"] = datetime.now()
-            
+        if saved_entity is not None:            
             del new_entity["_id"]
             
             # Il prodotto è stato aggiornato
@@ -67,5 +64,4 @@ class Entity(ABC):
         pass
             
     def save(self, entity):
-        entity["updated_at"] = datetime.now()
-        MongoDB().collection(self.collection()).insert_one(entity)
+         MongoDB().collection(self.collection()).insert_one(entity)

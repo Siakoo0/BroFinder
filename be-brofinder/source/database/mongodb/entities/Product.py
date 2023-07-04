@@ -22,11 +22,14 @@ class Product(Entity):
             url : str,
             reviews: List[Review] = [],
             images : List[str] = [],
-            _id=ObjectId(),
+            _id = None,
             reviews_summary = "",
             created_at=datetime.now(),
             keyword=""
         ) -> None:
+      
+        if _id is None:
+            _id = ObjectId()
         
         super().__init__(_id)
 
@@ -47,13 +50,8 @@ class Product(Entity):
     @classmethod
     def get(self, url : str):
         product = super().find({"url" : url})
-        
         if product is not None:
-            product["data"][-1]["_id"] = product["_id"]
-            product = product["data"][-1]
-            
             return Product(**product)
-        
         return None
 
     def isExpired(self, minutes=ProductParams.EXPIRATION_TIME) -> bool:
@@ -62,15 +60,16 @@ class Product(Entity):
 
     def save(self):
         entity = self.convert()
+        super().save(entity)
 
-        saved_entity = self.find({"url": self.url})
+        # saved_entity = self.find({"url": self.url})
 
-        if saved_entity is not None:
-            saved_entity["data"].append(entity)
-            saved_entity["scheduled_fetch"] = False
-            self.update(saved_entity)
-        else:
-            super().save({
-                "url" : entity["url"],
-                "data" : [entity]
-            })
+        # if saved_entity is not None:
+        #     saved_entity["data"].append(entity)
+        #     saved_entity["scheduled_fetch"] = False
+        #     self.update(saved_entity)
+        # else:
+        #     super().save({
+        #         "url" : entity["url"],
+        #         "data" : [entity]
+        #     })
