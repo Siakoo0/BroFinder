@@ -57,7 +57,7 @@ class Entity(ABC):
         )
         return list(entities)
 
-    def update(self,  new_entity, search_param = {}, updated_at=True):
+    def update(self,  new_entity, search_param = {}):
         if len(search_param.keys()) == 0:
             search_param["_id"] = new_entity["_id"]
             
@@ -66,8 +66,10 @@ class Entity(ABC):
         if saved_entity is not None:            
             del new_entity["_id"]
             
-            MongoDB().collection(self.collection()).replace_one(
-                search_param, new_entity
+            MongoDB().collection(self.collection()).update_one(
+                search_param, {
+                    "$set" : new_entity
+                }
             )
       
     def get(self):

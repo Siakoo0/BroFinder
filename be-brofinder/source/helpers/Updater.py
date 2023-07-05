@@ -8,6 +8,8 @@ from source.utils.Logger import Logger
 import time
 
 class Updater(Thread):
+    TIME_TO_WAIT = 5 #minutes
+    
     def __init__(self, queue : Queue) -> None:
         self.queue = queue
         self.logger = Logger.createLogger("ProductUpdater")
@@ -27,8 +29,6 @@ class Updater(Thread):
                 }
             )[:75]
             
-            # Limito il numero di risultati a 25 in maniera da partizionare il lavoro a turni
-            
             for prod in prods:
                 prod_ent = Product.get(prod["url"])
                 prod["_id"] = prod_ent._id
@@ -41,8 +41,8 @@ class Updater(Thread):
                 self.logger.debug("Il prodotto {} è stato schedulato per l'aggiornamento.".format(prod["url"]))
                 
                 
-            self.logger.debug("Ripresa tra 5 minuti dell'aggiornamento dei prodotti.")
-            time.sleep(60*5)
+            self.logger.debug(f"Ripresa tra {Updater.TIME_TO_WAIT} minuti dell'aggiornamento dei prodotti.")
+            time.sleep(60*Updater.TIME_TO_WAIT)
             
             
             

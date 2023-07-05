@@ -62,15 +62,3 @@ class Product(Entity):
     def save(self):
         entity = self.convert()
         super().save(entity)
-
-        # saved_entity = self.find({"url": self.url})
-
-        # if saved_entity is not None:
-        #     saved_entity["data"].append(entity)
-        #     saved_entity["scheduled_fetch"] = False
-        #     self.update(saved_entity)
-        # else:
-        #     super().save({
-        #         "url" : entity["url"],
-        #         "data" : [entity]
-        #     })

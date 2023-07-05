@@ -57,7 +57,6 @@ class Search(Entity):
         item = self.find({'text' : self.text, "user" : self.user})
         item = item | data
         
-        print(item)
         super().update(item)        
         
     def save(self, cb_fn = None):
