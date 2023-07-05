@@ -77,7 +77,7 @@ class AmazonScraper(Scraper):
         return product_links
     
     def extractProduct(self, data):
-        self.scrapeProduct(self.getPageSource(data["url"]), data["data"][0]["keyword"]) 
+        self.scrapeProduct(self.getPageSource(data["url"]), data["keyword"]) 
         self.logger.info(f"Estrazione del prodotto completata.")
     
     def scrapeProduct(self, product_page, keyword):

@@ -20,7 +20,10 @@ class Updater(Thread):
             
             prods = Product.getAll(
                 {
-                    "updated_at" : {"$lt" : expire_date}
+                    "$or" : [
+                        {"created_at" : {"$lt" : expire_date}},
+                        {"scheduled_fetch" : True}
+                    ]
                 }
             )[:75]
             

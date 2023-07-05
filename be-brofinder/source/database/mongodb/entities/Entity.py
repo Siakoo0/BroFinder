@@ -40,7 +40,21 @@ class Entity(ABC):
 
     @classmethod
     def getAll(self, params):
-        entities = MongoDB().collection(self.collection()).find(params)
+        entities = MongoDB().collection(self.collection()).aggregate([
+                {
+                    "$sort" : {"created_at" : -1}
+                },
+                {
+                    "$group" : {"_id" : "$url", "element" : {"$first": "$$ROOT"}}
+                },
+                {
+                    "$replaceRoot": { "newRoot": "$element"}
+                },
+                {
+                    "$match": params
+                },
+            ]
+        )
         return list(entities)
 
     def update(self,  new_entity, search_param = {}, updated_at=True):
@@ -52,10 +66,6 @@ class Entity(ABC):
         if saved_entity is not None:            
             del new_entity["_id"]
             
-            # Il prodotto è stato aggiornato
-            if "scheduled_fetch" in new_entity.keys() and not new_entity["scheduled_fetch"]:
-                del new_entity["scheduled_fetch"];
-                
             MongoDB().collection(self.collection()).replace_one(
                 search_param, new_entity
             )

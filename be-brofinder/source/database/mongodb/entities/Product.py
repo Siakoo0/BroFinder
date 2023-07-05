@@ -24,14 +24,12 @@ class Product(Entity):
             images : List[str] = [],
             _id = None,
             reviews_summary = "",
-            created_at=datetime.now(),
-            keyword=""
+            keyword="",
+            scheduled_fetch=False,
+            created_at=None
         ) -> None:
       
-        if _id is None:
-            _id = ObjectId()
-        
-        super().__init__(_id)
+        super().__init__(_id if _id is not None else ObjectId())
 
         self.name = name
         self.price = price
@@ -39,9 +37,11 @@ class Product(Entity):
         self.reviews = reviews
         self.images = images
         self.url = url
-        self.created_at = created_at
+        if created_at is None: self.created_at = datetime.now()
+        else: self.created_at = created_at
         self.reviews_summary = reviews_summary
         self.keyword=keyword
+        self.scheduled_fetch=scheduled_fetch
 
     @classmethod
     def collection(self):
@@ -50,6 +50,7 @@ class Product(Entity):
     @classmethod
     def get(self, url : str):
         product = super().find({"url" : url})
+
         if product is not None:
             return Product(**product)
         return None
