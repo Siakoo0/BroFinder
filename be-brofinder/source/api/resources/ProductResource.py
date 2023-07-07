@@ -43,8 +43,8 @@ class ProductResource(BaseResource):
         
         filters = {
             "url" : {"url" :  text},
-            "name" : {"data.name" :  {"$regex" : f'.*{text}.*'}},
-            "keyword" : {"data.keyword": {"$regex" : f'.*{text}.*'}}
+            "name" : {"name" :  {"$regex" : f'.*{text}.*'}},
+            "keyword" : {"keyword": {"$regex" : f'.*{text}.*'}}
         }
 
         or_cond = [filters[filt] for filt in args["filter"].split(",") if filt in filters.keys()]
@@ -61,6 +61,6 @@ class ProductResource(BaseResource):
         
         dto = ProductDTO()
         
-        serializer = lambda product: dto.build(**product["data"][-1])
+        serializer = lambda product: dto.build(**product)
         
         return list(map(serializer, products)), 200

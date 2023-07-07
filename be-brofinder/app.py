@@ -57,12 +57,6 @@ class App:
     for crawler in crawlers:
       crawler.start()
     
-    # post("http://localhost:8080/api/search", data={
-    #   "text" : "iphone 6",
-    #   "user" : 199791044,
-    #   "forward" : True
-    # })
-        
     while True: pass
 
 if __name__ == "__main__":

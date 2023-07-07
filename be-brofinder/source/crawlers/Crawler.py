@@ -24,8 +24,7 @@ class Crawler(Thread):
                  queue,
                  excluded_classes = [
                     # "source.crawlers.scrapers.AmazonScraper",
-                    "source.crawlers.scrapers.AmazonScraperOld",
-                    "source.crawlers.scrapers.EbayScraper"
+                    # "source.crawlers.scrapers.EbayScraper"
                  ],
                  mode: CrawlerMode = CrawlerMode.SEARCH,
                 ) -> None:

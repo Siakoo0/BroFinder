@@ -34,7 +34,7 @@ class Updater(Thread):
                 prod["_id"] = prod_ent._id
                 prod["scheduled_fetch"] = True
                 
-                prod_ent.update(prod, {}, False)
+                prod_ent.update(prod, {})
                 
                 self.queue.put(prod)
                 
