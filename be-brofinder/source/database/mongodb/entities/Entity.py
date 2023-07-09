@@ -39,22 +39,14 @@ class Entity(ABC):
         return None
 
     @classmethod
+    def find_by_id(self, id):
+        return MongoDB().collection(self.collection()).find_one({
+            "_id" : ObjectId(id)
+        })
+
+    @classmethod
     def getAll(self, params):
-        entities = MongoDB().collection(self.collection()).aggregate([
-                {
-                    "$sort" : {"created_at" : -1}
-                },
-                {
-                    "$group" : {"_id" : "$url", "element" : {"$first": "$$ROOT"}}
-                },
-                {
-                    "$replaceRoot": { "newRoot": "$element"}
-                },
-                {
-                    "$match": params
-                },
-            ]
-        )
+        entities = MongoDB().collection(self.collection()).find(params)
         return list(entities)
 
     def update(self,  new_entity, search_param = {}):

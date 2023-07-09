@@ -55,6 +55,28 @@ class Product(Entity):
             return Product(**product)
         return None
 
+    @classmethod
+    def getAll(self, params):
+        entities = MongoDB().collection(self.collection()).aggregate([
+                {
+                    "$sort" : {"created_at" : -1}
+                },
+                {
+                    "$group" : {"_id" : "$url", "element" : {"$first": "$$ROOT"}}
+                },
+                {
+                    "$replaceRoot": { "newRoot": "$element"}
+                },
+                {
+                    "$match": params
+                },
+                {
+                    "$sort" : {"_id" : -1}
+                }
+            ]
+        )
+        return list(entities)
+
     def isExpired(self, minutes=ProductParams.EXPIRATION_TIME) -> bool:
         now = datetime.now()
         return now - self.created_at > timedelta(minutes=minutes)

@@ -32,16 +32,14 @@ class Search(Entity):
             
     def exists(self):
         # Controllo se la ricerca risulta essere già effettuata
-        saved_entity = self.find({"text" : self.text, "user" : self.user})
+        saved_entity = self.find({"text" : self.text.lower(), "user" : self.user})
         return saved_entity is not None
     
     @classmethod
     def get(self, text, user):
         search = self.find({"text" : text, "user" : user})
         if search is not None:
-            del search["updated_at"]
             return Search(**search)
-
         return None
     
     def update(self, **search_param):
@@ -70,8 +68,7 @@ class Search(Entity):
         }
         
         opt_fields = {
-            "price" : self.price,
-            "publish_at" : self.publish_at
+            "price" : self.price
         }
 
         for field, value in opt_fields.items():
@@ -79,7 +76,7 @@ class Search(Entity):
                 search_record[field] = value
                 
         data = {
-            "text" : self.text
+            "text" : self.text.lower()
         } | search_record
 
         super().save(data)

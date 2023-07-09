@@ -1,7 +1,7 @@
 version: '3.9'
 services:
   mysqldb:
-    image: mysql:latest
+    image: mariadb:latest
     container_name: brofinder_database_sql
     restart: always
     ports:
@@ -12,7 +12,7 @@ services:
       MYSQL_ROOT_PASSWORD: password
   mongodb:
     container_name: brofinder_database_mongo
-    image: mongo
+    image: mongo:bionic
     restart: always
     volumes:
       - .data/mongodb:/data/db
@@ -21,9 +21,3 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=siakoo
       - MONGO_INITDB_ROOT_PASSWORD=password
-  redis:
-    container_name: redis
-    image: redis:alpine3.18
-    restart: always
-    ports:
-      - 6379:6379

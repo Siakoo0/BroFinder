@@ -11,49 +11,81 @@ from source.database.mongodb.entities.Search import Search
 from flask_restful import inputs
 
 
-class SearchResource(BaseResource):
+class SearchListResource(BaseResource):
     @property
     def urls(self):
         return ('/api/search', )
     
     def enqueue(self, data):
+        data["text"] = data["text"].lower()
         self.queues["crawler/search_queue"].put(data)
-    
+
+    def put(self):
+        rules = {
+            "text" : {
+                "type" : str,
+                "required" : True,
+                "location" : "json",
+                "help" : "Il campo 'text' risulta essere obbligatorio, ma non è stato passato."
+            },
+            "user" : {
+                "type" : int,
+                "required" : True,
+                "location" : "json",
+                "help" : "Il campo 'user' risulta essere obbligatorio, ma non è stato passato."
+            },
+            "forward" : {
+                "type" : bool,
+                "default" : False,
+                "location" : "json",
+                "help" : "Il campo 'user' risulta essere obbligatorio, ma non è stato passato."
+            }
+        }
+
+        args = self.validate(rules)
+
+        search : Search = Search.get(text=args['text'], user=args['user'])
+        search.update(forward=args["forward"])
+
+        dto = search.convert()
+        dto["forward"] = args["forward"]
+
+        return SearchDTO().build(**dto)
+
     def post(self):
         rules = {
             "text" : {
                 "type" : str,
                 "required" : True,
-                "location" : "form",
+                "location" : "json",
                 "help" : "Il campo 'text' risulta essere obbligatorio, ma non è stato passato."
             },
             "price" : {
                 "type" : int,
                 "default": None,
-                "location" : "form"
+                "location" : "json"
             },
             "user" : {
                 "type" : int,
                 "required" : True,
-                "location" : "form",
+                "location" : "json",
                 "help" : "Il campo 'user' risulta essere obbligatorio, ma non è stato passato."
             },
             "forward" : {
                 "type" : inputs.boolean,
                 "default": False,
-                "location" : "form"
+                "location" : "json"
             },
             "publish_at": {
                 "type" : lambda x: datetime.strptime(x,'%Y-%m-%dT%H:%M:%S'),
                 "default": None,
-                "location" : "form"
+                "location" : "json"
             }
         }
         
         args = self.validate(rules)
         
-        # TODO: Search(**args).save(self.enqueue)
-        self.enqueue({"text": args["text"]})
+        Search(**args).save(self.enqueue)
         
         return {
             "ok" : "Search Request generated"

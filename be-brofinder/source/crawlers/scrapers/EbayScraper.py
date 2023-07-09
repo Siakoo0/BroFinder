@@ -9,11 +9,13 @@ from source.crawlers.scrapers.Scraper import Scraper
 
 from urllib.parse import urlencode
 
+import re
+
 class EbayScraper(Scraper):
     
     @property
     def base_url(self):
-        return "https://www.ebay.it/sch/i.html"
+        return "https://www.ebay.it"
     
     def request(self, url, headers : dict = {}):
         headers = headers | {
@@ -25,7 +27,7 @@ class EbayScraper(Scraper):
     def search(self, product: str) -> List[Product]:
         
         params : dict = {"_nkw" : product}
-        url : str = "{}?{}".format(self.base_url, urlencode(params))
+        url : str = "{}/sch/i.html?{}".format(self.base_url, urlencode(params))
         
         response = self.request(url)
         
@@ -39,6 +41,10 @@ class EbayScraper(Scraper):
             for page in pages:
                 pool.submit(self.extractFromPage, page, products, product)
               
+
+    def extractProduct(self, item):
+        self.extractInfoProduct(item["url"], item["keyword"])
+        self.logger.info(f"Estrazione del prodotto completata {item['url']}.")
         
     #Funzione che estrapola gli elementi
     def extractFromPage(self, url, products : List[Product], keyword):
@@ -54,18 +60,14 @@ class EbayScraper(Scraper):
         self.logger.info(f"Estrapolazione link completata con successo nell'url {url}.")
         self.logger.debug(f"Il numero di link estrapolati della pagina {url} sono: {len(product_links)}")
         
-        products_list : List[Product] = []
-        
         for product in product_links:
             with ThreadPoolExecutor(10) as pool:
                 prod = Product.get(product)
                 if prod and prod.isExpired(): continue
                 
-                pool.submit(self.extractInfoProduct, product, products_list, keyword)
+                pool.submit(self.extractInfoProduct, product, keyword)
             
-        products.append(products_list)
-        
-    def extractInfoProduct(self, product_url : str, product_list : list, keyword):
+    def extractInfoProduct(self, product_url : str, keyword):
         print(f"Inizio fetching del prodotto {product_url}")
         
         # Entro nel prodotto selezionato e comincio lo scrape delle informazioni
@@ -76,7 +78,7 @@ class EbayScraper(Scraper):
         #creo il dizionario che conterrà tutte le info dei determianti prodotti
         product_info = {
             "name" : ".x-item-title__mainTitle span",
-            "price" : ".x-price-primary span span.ux-textspans"
+            "price" : ".x-price-primary span.ux-textspans"
         }
         
         for key, selector in product_info.items(): 
@@ -85,8 +87,16 @@ class EbayScraper(Scraper):
             if product_info[key]:
                 product_info[key] : Tag = product_info[key].text.strip()
             else:
-                product_info[key] = ""
+                product_info[key] = "Non disponibile"
             
+        price = product_info["price"].split(" ")
+
+        p = re.compile("([0-9])+\,([0-9])+")
+        price = [s for s in price if p.match(s)]
+        if len(price) > 0:
+            product_info["price"] = float(price[0].replace(",", "."))
+        else: product_info["price"] = "Non disponibile"
+
         #fino ad arrivare ai dettagli del prodotto, che inserisco in un array e che estrapolo uno alla volta
         descr_prod_1 = soup.select('.x-about-this-item .ux-labels-values__values .ux-labels-values__values-content')
         descr_prod = []
@@ -148,7 +158,6 @@ class EbayScraper(Scraper):
             
         prod = Product(**product_info)
         prod.save()
-        product_list.append(prod)
 
         self.logger.info(f'Fine fetching del prodotto in {product_url}')
         

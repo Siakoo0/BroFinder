@@ -75,4 +75,5 @@ class Crawler(Thread):
                     if self.mode == CrawlerMode.SEARCH:
                         worker.submit(scraper.search, item["text"])
                     elif self.mode == CrawlerMode.FETCH_URL and scraper.base_url in item["url"]:
-                        worker.submit(scraper.extractProduct, item)
+                        if scraper.base_url in item["url"]:
+                            worker.submit(scraper.extractProduct, item)
